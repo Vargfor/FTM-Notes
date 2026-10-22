@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window background matches the Compose surface so there is no flash before first frame. -->
+    <style name="Theme.FtmNotes" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ftm_background</item>
+    </style>
+
+    <color name="ftm_background">#FBF8F6</color>
+</resources>

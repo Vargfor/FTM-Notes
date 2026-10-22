@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">FTM Notes</string>
+
+    <!-- Top-level sections -->
+    <string name="tab_training">Training</string>
+    <string name="tab_food">Food</string>
+    <string name="tab_notes">Notes</string>
+
+    <!-- Common actions -->
+    <string name="action_search">Search</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_back">Back</string>
+
+    <!-- Training -->
+    <string name="training_subtitle">Workouts, plans &amp; progress</string>
+    <string name="training_empty_title">Your training log lives here</string>
+    <string name="training_empty_body">Log sets, reps and weight, build multi-week plans and let progression do the maths — every helper optional.</string>
+
+    <!-- Food -->
+    <string name="food_subtitle">Recipes &amp; shopping lists</string>
+    <string name="food_empty_title">Your cookbook lives here</string>
+    <string name="food_empty_body">Save recipes, scale portions, switch between US and metric with one tap, and tick things off while you cook.</string>
+
+    <!-- Notes -->
+    <string name="notes_subtitle">Everything else</string>
+    <string name="notes_empty_title">No notes yet</string>
+    <string name="notes_empty_body">Capture ideas, lists and anything that doesn’t fit elsewhere.</string>
+    <string name="notes_new">New note</string>
+    <string name="note_untitled">Untitled</string>
+    <string name="note_title_hint">Title</string>
+    <string name="note_body_hint">Start writing…</string>
+    <string name="note_select_hint">Select a note to read it here</string>
+
+    <!-- Settings / Search -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_placeholder">Appearance, modules, units and every feature toggle will live here.</string>
+    <string name="search_title">Search</string>
+    <string name="search_placeholder">Search across workouts, recipes and notes.</string>
+
+    <string name="coming_soon">Coming soon</string>
+</resources>

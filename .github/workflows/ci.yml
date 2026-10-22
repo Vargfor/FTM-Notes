@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *" # nightly, keeps the iOS job honest without burning macOS minutes on every push
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-jvm:
+    name: Tests + Android build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Unit tests and debug APK
+        run: ./gradlew :core:jvmTest :shared:desktopTest :shared:testAndroidHostTest :androidApp:assembleDebug
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
+
+  ios:
+    name: iOS tests + framework
+    # macOS runners cost 10x minutes on private repos: run on main, nightly and on demand only.
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - name: iOS simulator tests and framework link
+        run: ./gradlew :core:iosSimulatorArm64Test :shared:iosSimulatorArm64Test :shared:linkDebugFrameworkIosSimulatorArm64
+      - name: Build iOS app (simulator, unsigned)
+        run: |
+          xcodebuild -project iosApp/iosApp.xcodeproj -target iosApp \
+            -sdk iphonesimulator -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO build
