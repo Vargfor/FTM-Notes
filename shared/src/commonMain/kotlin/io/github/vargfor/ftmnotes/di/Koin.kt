@@ -2,6 +2,7 @@ package io.github.vargfor.ftmnotes.di
 
 import io.github.vargfor.ftmnotes.data.DeviceClock
 import io.github.vargfor.ftmnotes.data.DocumentRepository
+import io.github.vargfor.ftmnotes.data.Transactor
 import io.github.vargfor.ftmnotes.data.db.AppDatabase
 import io.github.vargfor.ftmnotes.feature.notes.NoteEditorViewModel
 import io.github.vargfor.ftmnotes.feature.notes.NotesViewModel
@@ -25,9 +26,12 @@ class AppScope : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.
 val dataModule = module {
     single { AppScope() }
     single { get<AppDatabase>().documentDao() }
+    single { get<AppDatabase>().importBatchDao() }
+    single { get<AppDatabase>().attachmentDao() }
     single { get<AppDatabase>().devicePrefDao() }
+    single { Transactor(get()) }
     single { DeviceClock(get()) }
-    single { DocumentRepository(get(), get()) }
+    single { DocumentRepository(get(), get(), get()) }
 }
 
 val viewModelModule = module {

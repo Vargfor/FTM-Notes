@@ -17,7 +17,7 @@ uses the Azul 21 toolchain from `gradle/gradle-daemon-jvm.properties`).
 | Android debug APK | `./gradlew :androidApp:assembleDebug` (install: `:androidApp:installDebug`) |
 | Desktop dev app + Hot Reload | `./gradlew :shared:hotRunDesktop` |
 | Single composable + Hot Reload | `./gradlew :shared:hotDevDesktop --className=… --funName=…` |
-| iOS | Can't build on Windows — CI (`.github/workflows/ci.yml`) runs iOS tests on macOS |
+| iOS compile check (Windows OK) | `./gradlew :core:compileTestKotlinIosArm64 :shared:compileKotlinIosArm64` (klib cross-compilation; linking/running iOS needs macOS → CI) |
 
 Debug builds install as `io.github.vargfor.ftmnotes.debug` next to release `io.github.vargfor.ftmnotes`.
 Emulators available locally: `Pixel_10`, `Medium_Tablet`.
@@ -55,3 +55,16 @@ Packages in `:shared`: `navigation` (routes, per-tab back stacks, shell), `desig
   rather than stack details.
 - **Tests:** engines and format logic get table-driven tests in `:core`; repository/DAO tests run
   against in-memory Room in `shared/src/desktopTest`.
+- **Common code must compile for iOS:** run the iOS compile check before finishing. Typical
+  pitfalls: use `okio.use` (not `kotlin.io.use`) on okio types, and `assertTrue` instead of `assert`.
+
+## Known library behaviour (from Phase 1 spikes)
+
+- **compose-rich-editor 1.2.1:** the Markdown output is stable after one load/save pass, which
+  `MarkdownRoundTripTest` pins. Quirks: blockquotes and code blocks are dropped, so importers must
+  flatten them to plain lines; a lone ` * ` loses the following space; backslash escapes get mangled,
+  so **importers must never escape** Markdown characters; a blank line is inserted before lists;
+  bare URLs become `[url](url)`. The editor only saves when its output differs from the baseline it
+  recorded after loading.
+- **Zip:** read with okio `FileSystem.openZip` (ZIP64, works on iOS). Write with
+  `core/backup/ZipWriter`, which is cross-checked against `java.util.zip`.

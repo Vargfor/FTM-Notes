@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 12+ backup rules.
+    Cloud backup (Google's Auto Backup) is capped at 25 MB and silently stops entirely above that,
+    so it holds only the database; attachment files are covered by FTM's own backups.
+    Device-to-device transfer has no size cap, so it takes everything.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="attachments/" />
+    </device-transfer>
+</data-extraction-rules>

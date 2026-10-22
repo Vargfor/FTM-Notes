@@ -42,16 +42,19 @@ class NoteEditorViewModel(
         private set
 
     private val saveLock = Mutex()
-    private var saved: NoteDocument? = null
+    private var existsInDb = false
+    /** Last title/content written (or loaded): the baseline that decides whether anything changed. */
+    private var baseline: Pair<String, String>? = null
 
     init {
         viewModelScope.launch {
             val existing = repository.get(noteId)?.document as? NoteDocument
-            saved = existing
+            existsInDb = existing != null
             isNew = existing == null
             existing?.let {
                 title.setTextAndPlaceCursorAtEnd(it.title)
                 content.setTextAndPlaceCursorAtEnd(it.content)
+                baseline = it.title to it.content
             }
             isLoaded = true
 
@@ -71,12 +74,19 @@ class NoteEditorViewModel(
     }
 
     private suspend fun persist(title: String, content: String) = saveLock.withLock {
-        val previous = saved
-        if (previous == null && title.isBlank() && content.isBlank()) return@withLock
-        val updated = (previous ?: NoteDocument(id = noteId)).copy(title = title.trim(), content = content)
-        if (updated == previous) return@withLock
-        repository.save(updated)
-        saved = updated
+        val edited = title.trim() to content
+        if (edited == baseline) return@withLock
+        if (!existsInDb) {
+            if (title.isBlank() && content.isBlank()) return@withLock
+            repository.save(NoteDocument(id = noteId, title = edited.first, content = edited.second))
+            existsInDb = true
+        } else {
+            // Read-modify-write on the stored version: keeps pin/colour/tags changed elsewhere.
+            repository.update(noteId) { doc ->
+                (doc as? NoteDocument)?.copy(title = edited.first, content = edited.second) ?: doc
+            }
+        }
+        baseline = edited
     }
 
     private companion object {

@@ -82,6 +82,13 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.koin.compose.navigation3)
+
+            implementation(libs.richeditor.compose)
+            implementation(libs.reorderable)
+            implementation(libs.coil.compose)
+            implementation(libs.filekit.core)
+            implementation(libs.filekit.dialogs.compose)
+            implementation(libs.filekit.coil)
         }
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
@@ -102,6 +109,7 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.compose.ui.test)
+                implementation(libs.androidx.room3.testing)
             }
         }
     }

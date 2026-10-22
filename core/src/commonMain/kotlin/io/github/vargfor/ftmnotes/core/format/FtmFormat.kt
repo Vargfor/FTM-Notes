@@ -3,6 +3,7 @@ package io.github.vargfor.ftmnotes.core.format
 import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
+import io.github.vargfor.ftmnotes.core.model.SettingsDocument
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -47,6 +48,7 @@ object FtmFormat {
     /** Serializers for document types this app version can read. Grows as feature phases land. */
     internal val supported: Map<DocumentType, KSerializer<out FtmDocument>> = mapOf(
         DocumentType.Note to NoteDocument.serializer(),
+        DocumentType.Settings to SettingsDocument.serializer(),
     )
 
     fun write(documents: List<FtmDocument>): String =

@@ -33,9 +33,12 @@ kotlin {
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.datetime)
             api(libs.kotlinx.serialization.json)
+            api(libs.okio) // zip read/write, hashing
+            implementation(libs.ksoup) // HTML → Markdown for importers
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.okio.fakefilesystem)
         }
     }
 }

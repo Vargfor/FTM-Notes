@@ -83,6 +83,31 @@ class FtmReaderTest {
     }
 
     @Test
+    fun infersChecklistKindFromItems() {
+        val result = FtmReader.read("""{"type": "note", "title": "Groceries", "items": [{"text": "Milk"}]}""")
+        val note = result.documents.single() as NoteDocument
+        assertEquals(NoteKind.Checklist, note.kind)
+        assertEquals("Milk", note.items.single().text)
+    }
+
+    @Test
+    fun normalisesColoursAndWarnsAboutUnknownOnes() {
+        val result = FtmReader.read(
+            """[{"type": "note", "color": "BLUE"}, {"type": "note", "color": "DEFAULT"}, {"type": "note", "color": "sparkly"}]"""
+        )
+        assertEquals(listOf("blue", null, null), result.documents.map { it.color })
+        assertEquals(listOf("$[2].color"), result.issues.filter { it.severity == ReadIssue.Severity.Warning }.map { it.path })
+    }
+
+    @Test
+    fun settingsCanOnlyBeReadFromBackups() {
+        val json = """{"type": "settings", "values": {}}"""
+        assertEquals(1, FtmReader.read(json).errors.size)
+        assertTrue(FtmReader.read(json).documents.isEmpty())
+        assertEquals(1, FtmReader.read(json, allowSettings = true).documents.size)
+    }
+
+    @Test
     fun reportsInvalidJsonInPlainLanguage() {
         val result = FtmReader.read("I couldn't produce JSON, sorry.")
         assertTrue(result.documents.isEmpty())

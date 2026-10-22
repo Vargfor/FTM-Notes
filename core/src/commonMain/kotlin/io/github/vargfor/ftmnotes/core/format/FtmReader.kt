@@ -2,6 +2,7 @@ package io.github.vargfor.ftmnotes.core.format
 
 import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
+import io.github.vargfor.ftmnotes.core.model.NoteColor
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -25,7 +26,11 @@ data class ReadResult(val documents: List<FtmDocument>, val issues: List<ReadIss
  */
 object FtmReader {
 
-    fun read(input: String): ReadResult {
+    /**
+     * @param allowSettings settings documents are only accepted from our own backups, never from
+     *   user/AI imports (an imported file must not be able to change app behaviour).
+     */
+    fun read(input: String, allowSettings: Boolean = false): ReadResult {
         val issues = mutableListOf<ReadIssue>()
         val json = extractJson(input, issues) ?: return ReadResult(emptyList(), issues)
 
@@ -56,12 +61,17 @@ object FtmReader {
 
         val documents = elements.mapIndexedNotNull { index, element ->
             val path = if (root is JsonObject && basePath == "$") "$" else "$basePath[$index]"
-            decodeOne(element, path, issues)
+            decodeOne(element, path, allowSettings, issues)
         }
         return ReadResult(documents, issues)
     }
 
-    private fun decodeOne(element: JsonElement, path: String, issues: MutableList<ReadIssue>): FtmDocument? {
+    private fun decodeOne(
+        element: JsonElement,
+        path: String,
+        allowSettings: Boolean,
+        issues: MutableList<ReadIssue>,
+    ): FtmDocument? {
         if (element !is JsonObject) {
             issues += error(path, "Each document must be a JSON object")
             return null
@@ -74,6 +84,10 @@ object FtmReader {
         val type = DocumentType.fromWire(rawType)
         if (type == null) {
             issues += error("$path.type", "Unknown type \"$rawType\". Use one of: ${DocumentType.entries.joinToString { it.wire }}")
+            return null
+        }
+        if (type == DocumentType.Settings && !allowSettings) {
+            issues += error("$path.type", "Settings can't be imported; only notes and other content can")
             return null
         }
         val serializer = FtmFormat.supported[type]
@@ -90,7 +104,7 @@ object FtmReader {
             issues += ReadIssue(ReadIssue.Severity.Warning, "$path.$key", "Ignored unknown field \"$key\"")
         }
 
-        val normalised = JsonObject(element.filterKeys { it != FtmFormat.DISCRIMINATOR })
+        val normalised = normalise(element, type, path, issues)
         return try {
             FtmFormat.lenient.decodeFromJsonElement(serializer, normalised)
         } catch (e: SerializationException) {
@@ -100,6 +114,37 @@ object FtmReader {
             issues += error(path, e.message ?: "Could not read this document")
             null
         }
+    }
+
+    /** Fixes common deviations before decoding: missing checklist `kind`, non-canonical colours. */
+    private fun normalise(element: JsonObject, type: DocumentType, path: String, issues: MutableList<ReadIssue>): JsonObject {
+        val fields = element.filterKeys { it != FtmFormat.DISCRIMINATOR }.toMutableMap()
+
+        if (type == DocumentType.Note && "kind" !in fields && (fields["items"] as? JsonArray)?.isNotEmpty() == true) {
+            fields["kind"] = JsonPrimitive("checklist")
+            issues += ReadIssue(ReadIssue.Severity.Info, "$path.kind", "Treated as a checklist because it has items")
+        }
+
+        val rawColor = (fields["color"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        if (rawColor != null) {
+            when (val parsed = NoteColor.parse(rawColor)) {
+                is NoteColor.Parsed.Color -> {
+                    fields["color"] = JsonPrimitive(parsed.color.wire)
+                    if (rawColor != parsed.color.wire) {
+                        issues += ReadIssue(ReadIssue.Severity.Info, "$path.color", "Interpreted colour \"$rawColor\" as \"${parsed.color.wire}\"")
+                    }
+                }
+                NoteColor.Parsed.Default -> fields.remove("color")
+                NoteColor.Parsed.Unknown -> {
+                    fields.remove("color")
+                    issues += ReadIssue(
+                        ReadIssue.Severity.Warning, "$path.color",
+                        "Unknown colour \"$rawColor\"; using no colour. Use one of: ${NoteColor.entries.joinToString { it.wire }}",
+                    )
+                }
+            }
+        }
+        return JsonObject(fields)
     }
 
     private fun checkVersion(root: JsonObject, issues: MutableList<ReadIssue>) {
