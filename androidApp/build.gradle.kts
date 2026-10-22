@@ -20,11 +20,11 @@ dependencies {
 }
 
 android {
-    namespace = "app.ftmnotes"
+    namespace = "io.github.vargfor.ftmnotes"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "app.ftmnotes"
+        applicationId = "io.github.vargfor.ftmnotes"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1

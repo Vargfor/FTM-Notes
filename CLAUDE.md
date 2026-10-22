@@ -19,7 +19,7 @@ uses the Azul 21 toolchain from `gradle/gradle-daemon-jvm.properties`).
 | Single composable + Hot Reload | `./gradlew :shared:hotDevDesktop --className=… --funName=…` |
 | iOS | Can't build on Windows — CI (`.github/workflows/ci.yml`) runs iOS tests on macOS |
 
-Debug builds install as `app.ftmnotes.debug` next to release `app.ftmnotes`.
+Debug builds install as `io.github.vargfor.ftmnotes.debug` next to release `io.github.vargfor.ftmnotes`.
 Emulators available locally: `Pixel_10`, `Medium_Tablet`.
 
 ## Architecture

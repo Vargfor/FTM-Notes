@@ -323,7 +323,7 @@ Each phase ends green on its exit criteria before the next starts. Food and Trai
 - Hot-reload iteration: `.\gradlew.bat :shared:desktopRun --hot` (exact task name confirmed in P0).
 
 ## Open decisions (defaults are assumed unless Henrik says otherwise)
-1. **App id / package.** `com.example.*` can't ship on Play, and the OAuth client depends on it. Default: `app.ftmnotes`. Please give the real id you want.
+1. **App id / package.** ✅ Decided: `io.github.vargfor.ftmnotes`. This is the Android `applicationId`, the iOS bundle id and the Kotlin package. It can't change once the app is published, and the Phase 5 Google OAuth client is registered against it.
 2. **Phase order.** Default is Food (P2) before Training (P3). Swap if the workout app is the one you most want to drop.
 3. **Cloud.** Default is zip backup in P1, then Google Drive sync in P5. Choose Supabase instead only if you want web access or sharing with other people.
 4. **Mac/iPhone access.** Default is GitHub Actions macOS runners. On a private repo, free macOS minutes are limited (×10 multiplier), so that job runs nightly or on main only.

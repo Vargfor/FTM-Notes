@@ -14,7 +14,7 @@ kotlin {
     iosSimulatorArm64()
 
     android {
-        namespace = "app.ftmnotes.core"
+        namespace = "io.github.vargfor.ftmnotes.core"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
 

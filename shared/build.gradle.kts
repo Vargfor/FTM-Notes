@@ -25,7 +25,7 @@ kotlin {
     jvm("desktop")
 
     android {
-        namespace = "app.ftmnotes.shared"
+        namespace = "io.github.vargfor.ftmnotes.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
 
@@ -122,11 +122,11 @@ room3 {
 }
 
 compose.resources {
-    packageOfResClass = "app.ftmnotes.resources"
+    packageOfResClass = "io.github.vargfor.ftmnotes.resources"
 }
 
 compose.desktop {
     application {
-        mainClass = "app.ftmnotes.MainKt"
+        mainClass = "io.github.vargfor.ftmnotes.MainKt"
     }
 }
