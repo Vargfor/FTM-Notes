@@ -33,7 +33,16 @@
 
     <!-- Settings / Search -->
     <string name="settings_title">Settings</string>
-    <string name="settings_placeholder">Appearance, modules, units and every feature toggle will live here.</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_pure_black">Pure black</string>
+    <string name="settings_pure_black_summary">Black backgrounds in the dark theme. Saves power on OLED screens.</string>
+    <string name="settings_sections">Sections</string>
+    <string name="settings_sections_summary">Choose which sections appear in the navigation bar.</string>
+    <string name="settings_start_tab">Open the app on</string>
     <string name="search_title">Search</string>
     <string name="search_placeholder">Search across workouts, recipes and notes.</string>
 

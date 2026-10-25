@@ -8,8 +8,11 @@ import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.Hlc
 import io.github.vargfor.ftmnotes.core.model.Ids
+import io.github.vargfor.ftmnotes.core.model.NoteDocument
+import io.github.vargfor.ftmnotes.core.model.SettingsDocument
 import io.github.vargfor.ftmnotes.core.model.withMeta
 import io.github.vargfor.ftmnotes.core.model.withOrganisation
+import io.github.vargfor.ftmnotes.core.notes.ChecklistOps
 import io.github.vargfor.ftmnotes.core.search.FtsQuery
 import io.github.vargfor.ftmnotes.data.db.DocTagEntity
 import io.github.vargfor.ftmnotes.data.db.DocumentDao
@@ -108,6 +111,29 @@ class DocumentRepository(
         val current = existing.decode() ?: return@write false
         writeIfChanged(id, transform(current), existing, Instant.fromEpochMilliseconds(existing.createdAt), dirty = true)
     }
+
+    /**
+     * Like [update], but stores [create]'s document when [id] doesn't exist yet — in the same
+     * transaction, so two quick calls can't both create it. A row that exists but can't be read
+     * (purged, or written by a newer app version) is left untouched.
+     * @return true if something changed.
+     */
+    suspend fun updateOrCreate(id: String, create: () -> FtmDocument, transform: (FtmDocument) -> FtmDocument): Boolean =
+        transactor.write {
+            val existing = dao.get(id)
+            when {
+                existing == null -> {
+                    val created = create()
+                    require(created.id == null || created.id == id) { "create() must use id $id" }
+                    writeIfChanged(id, created, existing = null, created.createdAt ?: now(), dirty = true)
+                }
+                existing.purged -> false
+                else -> {
+                    val current = existing.decode() ?: return@write false
+                    writeIfChanged(id, transform(current), existing, Instant.fromEpochMilliseconds(existing.createdAt), dirty = true)
+                }
+            }
+        }
 
     /** Inserts an imported document as new, keeping its source timestamps. @return the new id. */
     suspend fun importNew(document: FtmDocument, createdAt: Instant?, updatedAt: Instant?, batchId: String): String =
@@ -230,7 +256,8 @@ class DocumentRepository(
 
     private suspend fun writeProjections(id: String, doc: FtmDocument, plain: String, existing: DocumentEntity?, purged: Boolean) {
         dao.deleteTags(id)
-        if (purged) {
+        // Settings aren't content: they must never show up in search.
+        if (purged || doc is SettingsDocument) {
             dao.deleteFts(id)
             return
         }
@@ -276,12 +303,20 @@ class DocumentRepository(
         dao.deleteFts(id)
     }
 
-    /** Trims tags, drops blanks and case-insensitive duplicates (first spelling wins). */
+    /**
+     * Trims tags, drops blanks and case-insensitive duplicates (first spelling wins), and gives
+     * checklist items without an id one (imports, AI output) so they can be edited and merged.
+     */
     private fun normalised(document: FtmDocument): FtmDocument {
         val tags = document.tags.map { it.trim().replace(Regex("\\s+"), " ") }
             .filter { it.isNotEmpty() }
             .distinctBy(::tagKey)
-        return if (tags == document.tags) document else document.withOrganisation(tags = tags)
+        val withTags = if (tags == document.tags) document else document.withOrganisation(tags = tags)
+        return if (withTags is NoteDocument && withTags.items.any { it.id == null }) {
+            withTags.copy(items = ChecklistOps.withIds(withTags.items))
+        } else {
+            withTags
+        }
     }
 
     // Excludes updatedAt so that re-saving identical content is detected as "no change".

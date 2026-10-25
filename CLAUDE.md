@@ -4,6 +4,9 @@ One app for **F**ood (recipes, shopping lists), **T**raining (workouts, plans, p
 **M**isc notes. Kotlin Multiplatform (Android + iOS) with Compose Multiplatform UI.
 Full product/technical plan and phase roadmap: [`docs/PLAN.md`](docs/PLAN.md).
 
+**iOS is paused.** Android is the only target being developed until it is complete. The macOS CI
+job is disabled. Don't add iOS actuals or iOS-only features; just keep common code iOS-safe.
+
 ## Commands (Windows dev machine)
 
 The JDK on PATH is Java 8; run Gradle with a modern JDK, e.g. in Git Bash:
@@ -17,10 +20,11 @@ uses the Azul 21 toolchain from `gradle/gradle-daemon-jvm.properties`).
 | Android debug APK | `./gradlew :androidApp:assembleDebug` (install: `:androidApp:installDebug`) |
 | Desktop dev app + Hot Reload | `./gradlew :shared:hotRunDesktop` |
 | Single composable + Hot Reload | `./gradlew :shared:hotDevDesktop --className=… --funName=…` |
-| iOS compile check (Windows OK) | `./gradlew :core:compileTestKotlinIosArm64 :shared:compileKotlinIosArm64` (klib cross-compilation; linking/running iOS needs macOS → CI) |
+| iOS compile check (Windows OK; optional while iOS is paused) | `./gradlew :core:compileTestKotlinIosArm64 :shared:compileKotlinIosArm64` (klib cross-compilation; linking/running iOS needs macOS → CI) |
+| Load a Keep export into the desktop dev DB | `./gradlew :shared:devImportKeep -Pzips=a.zip,b.zip` (`FTM_DEV_DIR` overrides `~/.ftm-notes-dev`) |
 
 Debug builds install as `io.github.vargfor.ftmnotes.debug` next to release `io.github.vargfor.ftmnotes`.
-Emulators available locally: `Pixel_10`, `Medium_Tablet`.
+Emulators available locally: `Medium_Phone`, `Medium_Tablet`.
 
 ## Architecture
 
@@ -41,7 +45,10 @@ Packages in `:shared`: `navigation` (routes, per-tab back stacks, shell), `desig
   through `DocumentRepository.save()` — it maintains denormalised columns, hashes and the HLC.
 - **Lenient in, strict out.** `FtmReader` accepts messy input (AI output, other apps) and reports
   `ReadIssue`s with JSON paths; `FtmFormat.writer` produces canonical output.
-- **Everything optional.** New helpers/automation get a feature flag with a sensible default.
+- **Everything optional.** New helpers/automation get a feature flag with a sensible default, declared in
+  `core/settings/FeatureFlags.kt` (`Flags`) and read/written through `SettingsRepository`. Pick the scope:
+  `Synced` (settings document, merged per key by HLC) or `Device` (`device_prefs`: theme, layout). Flag ids
+  are stored — never rename one; unknown keys from newer versions are kept, not dropped.
 - **Display transforms never mutate data** (unit conversion, scaling).
 - **No data-loss paths:** soft delete (`deleted_at`), undo for destructive actions.
 - **Strings** go in `shared/src/commonMain/composeResources/values/strings.xml` — no hard-coded
@@ -55,8 +62,8 @@ Packages in `:shared`: `navigation` (routes, per-tab back stacks, shell), `desig
   rather than stack details.
 - **Tests:** engines and format logic get table-driven tests in `:core`; repository/DAO tests run
   against in-memory Room in `shared/src/desktopTest`.
-- **Common code must compile for iOS:** run the iOS compile check before finishing. Typical
-  pitfalls: use `okio.use` (not `kotlin.io.use`) on okio types, and `assertTrue` instead of `assert`.
+- **Keep common code iOS-safe:** CI still cross-compiles the iOS klibs on Linux. Running the local
+  iOS compile check is optional while iOS is paused. Typical pitfalls: use `okio.use` (not `kotlin.io.use`) on okio types, and `assertTrue` instead of `assert`.
 
 ## Known library behaviour (from Phase 1 spikes)
 
@@ -64,7 +71,12 @@ Packages in `:shared`: `navigation` (routes, per-tab back stacks, shell), `desig
   `MarkdownRoundTripTest` pins. Quirks: blockquotes and code blocks are dropped, so importers must
   flatten them to plain lines; a lone ` * ` loses the following space; backslash escapes get mangled,
   so **importers must never escape** Markdown characters; a blank line is inserted before lists;
-  bare URLs become `[url](url)`. The editor only saves when its output differs from the baseline it
+  bare URLs become `[url](url)`. Also: strike and underline can't coexist on the same text (strike is lost); leading indentation is
+  dropped; literal tag-like text such as `<b>` is parsed as HTML. Canonical blank lines are `
+
+` plus one
+  `<br>` line per extra blank line, and lists always get a blank line before them. Importers produce this
+  canonical form with `MarkdownLines` / `HtmlToMarkdown` (golden-tested in `MarkdownRoundTripTest`). The editor only saves when its output differs from the baseline it
   recorded after loading.
 - **Zip:** read with okio `FileSystem.openZip` (ZIP64, works on iOS). Write with
   `core/backup/ZipWriter`, which is cross-checked against `java.util.zip`.

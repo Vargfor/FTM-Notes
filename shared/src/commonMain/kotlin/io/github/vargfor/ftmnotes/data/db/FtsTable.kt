@@ -28,7 +28,7 @@ internal object FtsTable {
         INSERT INTO documents_fts(doc_id, title, body, tags)
         SELECT d.id, d.title, d.plain_text,
                IFNULL((SELECT group_concat(t.tag, ' ') FROM doc_tags t WHERE t.doc_id = d.id), '')
-        FROM documents d WHERE d.purged = 0
+        FROM documents d WHERE d.purged = 0 AND d.type != 'settings'
     """
 
     const val DROP = "DROP TABLE IF EXISTS documents_fts"

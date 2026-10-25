@@ -6,9 +6,12 @@ import io.github.vargfor.ftmnotes.data.Transactor
 import io.github.vargfor.ftmnotes.data.db.AppDatabase
 import io.github.vargfor.ftmnotes.feature.notes.NoteEditorViewModel
 import io.github.vargfor.ftmnotes.feature.notes.NotesViewModel
+import io.github.vargfor.ftmnotes.feature.settings.SettingsViewModel
+import io.github.vargfor.ftmnotes.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
@@ -16,6 +19,8 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.KoinAppDeclaration
 import org.koin.dsl.module
+import org.koin.mp.KoinPlatform
+import kotlin.time.Duration.Companion.seconds
 
 /** Provides the [AppDatabase] (and later other platform services) for each platform. */
 expect val platformModule: Module
@@ -32,14 +37,25 @@ val dataModule = module {
     single { Transactor(get()) }
     single { DeviceClock(get()) }
     single { DocumentRepository(get(), get(), get()) }
+    // Eager: starts reading settings while the platform is still starting up.
+    single(createdAtStart = true) { SettingsRepository(get(), get(), get(), get()) }
 }
 
 val viewModelModule = module {
     viewModelOf(::NotesViewModel)
+    viewModelOf(::SettingsViewModel)
     viewModel { (noteId: String) -> NoteEditorViewModel(noteId, get(), get()) }
 }
 
 fun initKoin(config: KoinAppDeclaration = {}): KoinApplication = startKoin {
     config()
     modules(platformModule, dataModule, viewModelModule)
+}
+
+/**
+ * Waits for settings to be read so the first frame already has the right theme and start tab.
+ * It's a small database read; the timeout only guards against a stuck database.
+ */
+suspend fun awaitStartupSettings() {
+    withTimeoutOrNull(2.seconds) { KoinPlatform.getKoin().get<SettingsRepository>().awaitLoaded() }
 }

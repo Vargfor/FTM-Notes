@@ -8,11 +8,12 @@ import kotlin.test.assertEquals
 
 class AppNavigatorTest {
 
-    private fun navigator(startTab: Tab = Tab.Notes) = AppNavigator(
-        stacks = Tab.entries.associateWith { NavBackStack<NavKey>(it.root) },
-        startTab = startTab,
-        currentTabName = mutableStateOf(startTab.name),
-    )
+    // Shared like rememberAppNavigator's saved state, so a navigator rebuilt after a settings change sees it.
+    private val stacks = Tab.entries.associateWith { NavBackStack<NavKey>(it.root) }
+    private val currentTabName = mutableStateOf(Tab.Notes.name)
+
+    private fun navigator(startTab: Tab = Tab.Notes, enabledTabs: List<Tab> = Tab.entries) =
+        AppNavigator(stacks, startTab, currentTabName, enabledTabs)
 
     @Test
     fun eachTabKeepsItsOwnBackStackWhenSwitching() {
@@ -55,5 +56,35 @@ class AppNavigatorTest {
 
         nav.goBack()
         assertEquals(listOf<NavKey>(Route.NotesHome), nav.stack(Tab.Notes).toList())
+    }
+
+    @Test
+    fun hidingTheSelectedTabFallsBackToTheStartTabAndKeepsItsStack() {
+        navigator().apply {
+            selectTab(Tab.Food)
+            navigate(Route.Settings)
+        }
+        // Settings change: Food is hidden, so a new navigator is built with fewer tabs.
+        val nav = navigator(enabledTabs = listOf(Tab.Training, Tab.Notes))
+        assertEquals(Tab.Notes, nav.currentTab)
+        assertEquals(listOf(Tab.Notes), nav.visibleTabs)
+
+        nav.selectTab(Tab.Food) // not in the bar: ignored
+        assertEquals(Tab.Notes, nav.currentTab)
+
+        // Showing Food again restores where it was.
+        val shown = navigator()
+        assertEquals(Tab.Food, shown.currentTab)
+        assertEquals(listOf<NavKey>(Route.FoodHome, Route.Settings), shown.stack(Tab.Food).toList())
+    }
+
+    @Test
+    fun aDifferentStartTabIsWhereBackEndsUp() {
+        currentTabName.value = Tab.Training.name // a fresh launch opens on the start tab
+        val nav = navigator(startTab = Tab.Training)
+        assertEquals(Tab.Training, nav.currentTab)
+        nav.selectTab(Tab.Notes)
+        nav.goBack()
+        assertEquals(Tab.Training, nav.currentTab)
     }
 }

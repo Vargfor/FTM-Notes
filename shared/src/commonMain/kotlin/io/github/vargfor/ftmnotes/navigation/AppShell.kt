@@ -4,12 +4,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ShortNavigationBarItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -18,6 +22,8 @@ import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.vargfor.ftmnotes.core.model.Ids
+import io.github.vargfor.ftmnotes.core.settings.SettingsSnapshot
+import io.github.vargfor.ftmnotes.core.settings.TabLayout
 import io.github.vargfor.ftmnotes.designsystem.SectionTheme
 import io.github.vargfor.ftmnotes.feature.food.FoodHomeScreen
 import io.github.vargfor.ftmnotes.feature.notes.NoteEditorScreen
@@ -34,9 +40,16 @@ import org.jetbrains.compose.resources.stringResource
  * [NavDisplay] that shows the current tab's back stack, with list-detail panes where useful.
  */
 @Composable
-fun AppShell() {
-    val navigator = rememberAppNavigator()
+fun AppShell(tabLayout: TabLayout = SettingsSnapshot.Defaults.tabLayout()) {
+    val enabledTabs = remember(tabLayout) { tabLayout.tabs.map(Tab::of) }
+    val navigator = rememberAppNavigator(startTab = Tab.of(tabLayout.start), enabledTabs = enabledTabs)
     val listDetail = rememberListDetailSceneStrategy<NavKey>()
+    // A single section needs no navigation bar.
+    val navigationSuiteType = if (enabledTabs.size > 1) {
+        NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfo())
+    } else {
+        NavigationSuiteType.None
+    }
 
     // Decorate each tab's stack separately so saved UI state and ViewModels of background tabs
     // stay alive while another tab is shown.
@@ -62,8 +75,9 @@ fun AppShell() {
             selectedTextColor = MaterialTheme.colorScheme.primary,
         )
         NavigationSuiteScaffold(
+            navigationSuiteType = navigationSuiteType,
             navigationItems = {
-                Tab.entries.forEach { tab ->
+                navigator.enabledTabs.forEach { tab ->
                     val selected = tab == currentTab
                     NavigationSuiteItem(
                         selected = selected,

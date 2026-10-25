@@ -9,8 +9,8 @@ import java.io.File
 
 actual val platformModule: Module = module {
     single<AppDatabase> {
-        // Dev-only target: keep data out of the repo, in the user's home directory.
-        val dir = File(System.getProperty("user.home"), ".ftm-notes-dev").apply { mkdirs() }
+        // Dev-only target: keep data out of the repo, in the user's home directory (FTM_DEV_DIR overrides).
+        val dir = (System.getenv("FTM_DEV_DIR")?.let(::File) ?: File(System.getProperty("user.home"), ".ftm-notes-dev")).apply { mkdirs() }
         Room.databaseBuilder<AppDatabase>(File(dir, AppDatabase.FILE_NAME).absolutePath)
             .buildFtmDatabase()
     }

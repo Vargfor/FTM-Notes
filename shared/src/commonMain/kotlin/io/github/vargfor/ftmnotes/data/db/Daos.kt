@@ -186,6 +186,9 @@ interface DevicePrefDao {
     @Query("SELECT * FROM device_prefs")
     suspend fun all(): List<DevicePrefEntity>
 
+    @Query("SELECT * FROM device_prefs")
+    fun observeAll(): Flow<List<DevicePrefEntity>>
+
     @Upsert
     suspend fun put(pref: DevicePrefEntity)
 

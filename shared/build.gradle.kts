@@ -138,3 +138,14 @@ compose.desktop {
         mainClass = "io.github.vargfor.ftmnotes.MainKt"
     }
 }
+
+// Dev-only: `./gradlew :shared:devImportKeep -Pzips=a.zip,b.zip` loads a Keep export into the desktop dev database.
+tasks.register<JavaExec>("devImportKeep") {
+    group = "dev"
+    description = "Imports a Google Keep Takeout export (zips or folders, comma-separated in -Pzips) into the desktop dev database."
+    val main = kotlin.jvm("desktop").compilations.getByName("main")
+    classpath(main.output.allOutputs, main.runtimeDependencyFiles)
+    mainClass.set("io.github.vargfor.ftmnotes.dev.DevKeepImportKt")
+    workingDir = rootDir
+    args(providers.gradleProperty("zips").map { it.split(',').map(String::trim) }.getOrElse(emptyList()))
+}

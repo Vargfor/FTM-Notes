@@ -4,11 +4,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import io.github.vargfor.ftmnotes.di.awaitStartupSettings
 import io.github.vargfor.ftmnotes.di.initKoin
+import kotlinx.coroutines.runBlocking
 
 /** Dev-only desktop launcher for fast UI iteration (Compose Hot Reload). Phone-sized by default. */
 fun main() {
     initKoin()
+    runBlocking { awaitStartupSettings() }
     application {
         Window(
             onCloseRequest = ::exitApplication,

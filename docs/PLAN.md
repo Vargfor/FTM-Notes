@@ -19,7 +19,7 @@ Cross-cutting goals:
 - Targets: android, iosArm64, iosSimulatorArm64.
 - Package `com.example.ftm_notes`. Not a git repo.
 
-**Dev machine is Windows.** Android is the main loop. iOS is built and tested by macOS CI from Phase 0 on, so all logic and UI live in common code.
+**Dev machine is Windows.** Android is the main loop. All logic and UI live in common code. **iOS is paused until the Android app is complete:** the macOS CI job is disabled and comes back in P6. Until then, common code stays iOS-safe through the Linux klib cross-compile in CI.
 
 ## Guiding principles
 1. **One canonical document format ("FTM format").** Every note is a typed JSON document. The same format is used for DB payloads, import/export, the AI schema, cloud sync and backups. Build it once, test it once.
@@ -299,7 +299,7 @@ Each phase ends green on its exit criteria before the next starts. Food and Trai
 | **P3 Training** | • Library, templates, live session, rest-timer service, history/PRs<br>• Plans with linear, double and manual progression<br>• Strong CSV import; workout AI prompts | • Engine tests<br>• Session survives `adb shell am kill`<br>• Rest alert with screen off (manual check) |
 | **P4 Import hub** | • Share target (Samsung Notes), txt/md/docx, ENEX<br>• "Use any AI" paste flow for all types<br>• Convert note → recipe/workout | • Fixture tests<br>• Corpus of real LLM outputs (fences, aliases, numbers as strings) |
 | **P5 Sync** | • SyncEngine against a fake provider first<br>• Then the Drive provider + Android auth + sync settings UI | • Simulated multi-device scenarios and a randomised test (all devices end up identical, nothing lost)<br>• Manual two-phone test |
-| **P6 Polish & iOS** | • iOS actuals, GoogleSignIn bridge, share extension, notifications<br>• Charts (e1RM/volume); percentage waves and RPE<br>• Accessibility audit, baseline profiles, icon/branding, TestFlight / Play internal track | — |
+| **P6 Polish & iOS** | • Re-enable the macOS CI job and its nightly schedule<br>• iOS actuals, GoogleSignIn bridge, share extension, notifications<br>• Charts (e1RM/volume); percentage waves and RPE<br>• Accessibility audit, baseline profiles, icon/branding, TestFlight / Play internal track | — |
 
 ## Testing strategy
 - **`:core` (JVM, fast):**
@@ -319,7 +319,7 @@ Each phase ends green on its exit criteria before the next starts. Food and Trai
 ## Verification (each phase)
 - `.\gradlew.bat :core:jvmTest :shared:testAndroidHostTest :shared:desktopTest`
 - `.\gradlew.bat :androidApp:assembleDebug` then `:androidApp:installDebug` on an emulator or device, and walk the phase's user flows.
-- CI: the macOS job runs `./gradlew :shared:iosSimulatorArm64Test` and links the framework.
+- CI: the macOS job runs `./gradlew :shared:iosSimulatorArm64Test` and links the framework (paused; re-enabled in P6).
 - Hot-reload iteration: `.\gradlew.bat :shared:desktopRun --hot` (exact task name confirmed in P0).
 
 ## Open decisions (defaults are assumed unless Henrik says otherwise)

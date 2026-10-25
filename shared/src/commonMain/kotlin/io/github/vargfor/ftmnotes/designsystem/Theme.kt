@@ -27,14 +27,22 @@ private val FtmShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp),
 )
 
-/** App-wide theme: warm-neutral base, expressive motion, rounded shapes. */
+/**
+ * App-wide theme: warm-neutral base, expressive motion, rounded shapes.
+ * [pureBlack] only applies in the dark theme (true-black backgrounds for OLED screens).
+ */
 @Composable
 fun FtmTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    pureBlack: Boolean = false,
     section: Section = Section.Notes,
     content: @Composable () -> Unit,
 ) {
-    val base = if (darkTheme) BaseDark else BaseLight
+    val base = when {
+        !darkTheme -> BaseLight
+        pureBlack -> BasePureBlack
+        else -> BaseDark
+    }
     MaterialExpressiveTheme(
         colorScheme = base.withAccent(section.accent().tones(darkTheme)),
         motionScheme = MotionScheme.expressive(),

@@ -99,3 +99,15 @@ internal val NotesAccent = SectionAccent(
     light = AccentTones(Color(0xFF3B5F92), Color(0xFFFFFFFF), Color(0xFFD5E3FF), Color(0xFF001B3C)),
     dark = AccentTones(Color(0xFFA7C8FF), Color(0xFF02315F), Color(0xFF214777), Color(0xFFD5E3FF)),
 )
+
+/** Dark theme for OLED screens: true-black backgrounds, containers stepped up from black. */
+internal val BasePureBlack: ColorScheme = BaseDark.copy(
+    background = Color(0xFF000000),
+    surface = Color(0xFF000000),
+    surfaceDim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF0C0B0B),
+    surfaceContainer = Color(0xFF121110),
+    surfaceContainerHigh = Color(0xFF1B1A19),
+    surfaceContainerHighest = Color(0xFF252423),
+)

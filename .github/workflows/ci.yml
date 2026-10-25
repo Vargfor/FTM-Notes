@@ -5,8 +5,9 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * *" # nightly, keeps the iOS job honest without burning macOS minutes on every push
+  # Nightly schedule paused with the iOS job; restore it when iOS is re-enabled (P6):
+  # schedule:
+  #   - cron: "0 3 * * *" # nightly, keeps the iOS job honest without burning macOS minutes on every push
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -35,7 +36,8 @@ jobs:
   ios:
     name: iOS tests + framework
     # macOS runners cost 10x minutes on private repos: run on master, nightly and on demand only.
-    if: github.event_name != 'pull_request'
+    # Paused until the Android app is complete (see docs/PLAN.md); was: github.event_name != 'pull_request'
+    if: false
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
