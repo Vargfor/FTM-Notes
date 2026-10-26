@@ -1,12 +1,23 @@
 package io.github.vargfor.ftmnotes.di
 
 import io.github.vargfor.ftmnotes.data.DeviceClock
+import io.github.vargfor.ftmnotes.data.AttachmentStore
+import io.github.vargfor.ftmnotes.data.ImportCoordinator
+import io.github.vargfor.ftmnotes.data.BackupService
+import io.github.vargfor.ftmnotes.data.RecipeImportService
+import io.ktor.client.HttpClient
+import io.github.vargfor.ftmnotes.platform.PlatformBridge
+import io.github.vargfor.ftmnotes.platform.UnsupportedPlatformBridge
+import io.github.vargfor.ftmnotes.platform.AppPlatform
 import io.github.vargfor.ftmnotes.data.DocumentRepository
 import io.github.vargfor.ftmnotes.data.Transactor
 import io.github.vargfor.ftmnotes.data.db.AppDatabase
 import io.github.vargfor.ftmnotes.feature.notes.NoteEditorViewModel
 import io.github.vargfor.ftmnotes.feature.notes.NotesViewModel
 import io.github.vargfor.ftmnotes.feature.settings.SettingsViewModel
+import io.github.vargfor.ftmnotes.feature.food.RecipeEditorViewModel
+import io.github.vargfor.ftmnotes.feature.food.RecipeViewModel
+import io.github.vargfor.ftmnotes.feature.food.ShoppingViewModel
 import io.github.vargfor.ftmnotes.settings.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,11 +40,17 @@ expect val platformModule: Module
 class AppScope : CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 val dataModule = module {
+    single { AppPlatform(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge) }
     single { AppScope() }
     single { get<AppDatabase>().documentDao() }
     single { get<AppDatabase>().importBatchDao() }
     single { get<AppDatabase>().attachmentDao() }
     single { get<AppDatabase>().devicePrefDao() }
+    single { get<AppDatabase>().revisionDao() }
+    single { AttachmentStore(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get()) }
+    single { ImportCoordinator(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get(), get(), get(), get(), get()) }
+    single { BackupService(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { RecipeImportService(getOrNull<HttpClient>(), get(), get()) }
     single { Transactor(get()) }
     single { DeviceClock(get()) }
     single { DocumentRepository(get(), get(), get()) }
@@ -45,6 +62,9 @@ val viewModelModule = module {
     viewModelOf(::NotesViewModel)
     viewModelOf(::SettingsViewModel)
     viewModel { (noteId: String) -> NoteEditorViewModel(noteId, get(), get()) }
+    viewModel { (id: String) -> RecipeEditorViewModel(id, get(), get()) }
+    viewModel { (id: String) -> RecipeViewModel(id, get(), get(), get(), get()) }
+    viewModel { (id: String) -> ShoppingViewModel(id, get(), get()) }
 }
 
 fun initKoin(config: KoinAppDeclaration = {}): KoinApplication = startKoin {

@@ -11,8 +11,9 @@ sync to your own cloud storage. You can import from Google Keep, Samsung Notes (
 Markdown, recipe websites and other apps, plus an AI-friendly schema so any AI assistant can
 produce importable notes.
 
-> Status: early development (Phase 0 — foundation). See [`docs/PLAN.md`](docs/PLAN.md) for the
-> roadmap.
+> Status: Phase 1 notes/imports/backups and Phase 2 Food are implemented for Android.
+> Automated tests and emulator checks pass; a real Keep Takeout import and backup-provider checks
+> on Henrik's phone remain pending. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for verification status.
 
 ## Project layout
 

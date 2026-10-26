@@ -79,11 +79,15 @@ interface DocumentDao {
         SELECT $LIST_COLUMNS FROM documents d
         JOIN documents_fts f ON f.doc_id = d.id
         WHERE documents_fts MATCH :match AND d.deleted_at IS NULL
+          AND (:type IS NULL OR d.type = :type)
+          AND (:tag IS NULL OR EXISTS (SELECT 1 FROM doc_tags t WHERE t.doc_id = d.id AND t.tag_key = :tag))
+          AND (:color IS NULL OR d.color = :color)
+          AND (:includeArchived OR d.archived = 0)
         ORDER BY bm25(documents_fts, 0.0, 10.0, 1.0, 5.0)
         LIMIT 200
         """
     )
-    suspend fun search(match: String): List<DocumentListRow>
+    suspend fun search(match: String, type: String? = null, tag: String? = null, color: String? = null, includeArchived: Boolean = true): List<DocumentListRow>
 
     /** Emits whenever any document is written (every write advances the HLC). */
     @Query("SELECT MAX(hlc) FROM documents")
@@ -194,4 +198,19 @@ interface DevicePrefDao {
 
     @Query("DELETE FROM device_prefs WHERE `key` = :key")
     suspend fun remove(key: String)
+}
+
+@Dao
+interface DocumentRevisionDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(revision: DocumentRevisionEntity)
+
+    @Query("SELECT * FROM doc_revisions ORDER BY created_at DESC, id DESC")
+    suspend fun all(): List<DocumentRevisionEntity>
+
+    @Query("SELECT * FROM doc_revisions WHERE doc_id = :docId ORDER BY created_at DESC, id DESC")
+    fun observe(docId: String): Flow<List<DocumentRevisionEntity>>
+
+    @Query("DELETE FROM doc_revisions WHERE doc_id = :docId AND id NOT IN (SELECT id FROM doc_revisions WHERE doc_id = :docId ORDER BY created_at DESC, id DESC LIMIT :keep)")
+    suspend fun trim(docId: String, keep: Int = 20)
 }

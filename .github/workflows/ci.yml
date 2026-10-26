@@ -32,6 +32,13 @@ jobs:
         with:
           name: test-reports
           path: "**/build/reports/tests/"
+      - name: Upload screen captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-captures
+          path: shared/build/reports/screenshots/
+          if-no-files-found: ignore
 
   ios:
     name: iOS tests + framework

@@ -50,7 +50,8 @@ class DocumentRepositoryTest {
         val id = repository.save(note)
 
         val stored = assertNotNull(repository.get(id))
-        assertEquals(note.copy(id = id, createdAt = now, updatedAt = now), stored.document)
+        assertEquals(note.copy(id = id, createdAt = now, updatedAt = now,
+            items = note.items.map { it.copy(modifiedHlc = stored.hlc) }), stored.document)
         assertEquals(now, stored.createdAt)
     }
 

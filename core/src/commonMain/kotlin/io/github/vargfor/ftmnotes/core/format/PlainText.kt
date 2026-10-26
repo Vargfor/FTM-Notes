@@ -4,12 +4,17 @@ import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
 import io.github.vargfor.ftmnotes.core.model.NoteKind
 import io.github.vargfor.ftmnotes.core.model.SettingsDocument
+import io.github.vargfor.ftmnotes.core.model.RecipeDocument
+import io.github.vargfor.ftmnotes.core.model.ShoppingListDocument
 
 /** Searchable, preview-friendly text for a document (Markdown syntax stripped). */
 fun FtmDocument.plainText(): String = when (this) {
+    is RecipeDocument -> (listOf(description, notes, sourceUrl.orEmpty(), sourceName.orEmpty()) +
+        ingredientGroups.flatMap { group -> listOf(group.name.orEmpty()) + group.items.map { it.raw + " " + it.name + " " + it.note } } + steps.map { it.text }).joinToString("\n")
+    is ShoppingListDocument -> items.filterNot { it.deleted }.joinToString("\n") { it.text }
     is NoteDocument -> when (kind) {
         NoteKind.Text -> stripMarkdown(content)
-        NoteKind.Checklist -> items.joinToString("\n") { it.text }
+        NoteKind.Checklist -> items.filterNot { it.deleted }.joinToString("\n") { it.text }
     }
     is SettingsDocument -> ""
 }
@@ -32,16 +37,24 @@ private const val PREVIEW_CHARS = 400
 private const val PREVIEW_ITEMS = 8
 
 fun FtmDocument.listProjection(): ListProjection = when (this) {
+    is RecipeDocument -> ListProjection((description.ifBlank { ingredientGroups.flatMap { it.items }.joinToString(", ") { it.name.ifBlank { it.raw } } }).take(PREVIEW_CHARS), 0, 0, images.firstOrNull { it.isImage }?.sha256)
+    is ShoppingListDocument -> {
+        val active = items.filterNot { it.deleted }
+        ListProjection((active.filterNot { it.checked } + active.filter { it.checked }).take(PREVIEW_ITEMS).joinToString("\n") {
+            "${if (it.checked) CHECKED_MARK else UNCHECKED_MARK} ${it.text}"
+        }, active.size, active.count { it.checked }, null)
+    }
     is NoteDocument -> {
         val thumb = attachments.firstOrNull { it.isImage }?.sha256
         when (kind) {
             NoteKind.Text -> ListProjection(plainText().take(PREVIEW_CHARS), 0, 0, thumb)
             NoteKind.Checklist -> {
-                val ordered = items.filter { !it.checked } + items.filter { it.checked }
+                val active = items.filterNot { it.deleted }
+                val ordered = active.filter { !it.checked } + active.filter { it.checked }
                 val preview = ordered.take(PREVIEW_ITEMS).joinToString("\n") { item ->
                     "${if (item.checked) CHECKED_MARK else UNCHECKED_MARK} ${item.text.take(120)}"
                 }
-                ListProjection(preview, items.size, items.count { it.checked }, thumb)
+                ListProjection(preview, active.size, active.count { it.checked }, thumb)
             }
         }
     }

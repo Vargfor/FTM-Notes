@@ -291,6 +291,13 @@ iosApp        SwiftUI shell; later GoogleSignIn bridge + share extension
 ## Roadmap
 Each phase ends green on its exit criteria before the next starts. Food and Training (P2/P3) can swap places.
 
+**2026-10-26:** Phases 1–2 are implemented for Android. Domain/data/UI tests, Food engine properties,
+40 desktop screen captures, Android assembly and iOS common-code compilation are verified.
+Phone/tablet emulator checks cover notes, recipes, photos, sharing, local backups and background
+cooking alerts. Phase 1's real Keep Takeout import and Drive/OneDrive checks on Henrik's phone
+remain pending, so the combined completion gate for starting Training is still open.
+See [`ROADMAP.md`](ROADMAP.md) for the current acceptance record.
+
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **P0 Foundation** | • git init; CLAUDE.md (commands, conventions); **package rename**; minSdk 26; Kotlin 2.4.21 / CMP 1.12.2<br>• New libraries: Room 3, KSP, serialization, Nav3, Koin, adaptive, Reorderable, FileKit, rich-editor, Ktor<br>• `:core` module; desktop dev target<br>• `documents` table + DAO; FTM envelope + lenient-reader skeleton<br>• Theme/design tokens; Nav3 shell with 3 tabs and adaptive panes<br>• GitHub repo + Actions (Linux: host tests + `assembleDebug`; macOS: iOS simulator tests)<br>• 1-hour Roborazzi spike | • Local and CI builds green<br>• DAO round-trip test passes<br>• Each tab keeps its back stack when switching<br>• App runs on emulator |
@@ -313,7 +320,7 @@ Each phase ends green on its exit criteria before the next starts. Food and Trai
   - a `FakeClock`
   - 2–3 simulated devices
 - **UI:** about 10 `runComposeUiTest` flows on the desktop target (log set + undo, check item + undo, servings stepper, editor toolbar).
-- **Screenshots:** Roborazzi in light/dark, font scale 1×/2×, phone and tablet. If the P0 spike fails with the new KMP plugin, use desktop screenshots instead.
+- **Screenshots:** desktop Compose captures in light/dark, font scale 1×/2×, phone and tablet, with semantic assertions. PNGs are CI review artifacts, avoiding cross-platform font differences in pixel goldens.
 - **Manual checklists:** notifications, foreground service, share target, Drive auth.
 
 ## Verification (each phase)

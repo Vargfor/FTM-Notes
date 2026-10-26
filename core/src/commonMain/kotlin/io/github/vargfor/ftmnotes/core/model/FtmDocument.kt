@@ -71,6 +71,8 @@ data class ChecklistItem(
     val text: String = "",
     val checked: Boolean = false,
     val indent: Int = 0,
+    val modifiedHlc: String? = null,
+    val deleted: Boolean = false,
 )
 
 /** A file attached to a document. The bytes live in the attachment store under [sha256]. */
@@ -116,6 +118,8 @@ data class SettingValue(val v: JsonElement, val hlc: String)
 
 /** Returns a copy with the storage-managed fields replaced. */
 fun FtmDocument.withMeta(id: String, createdAt: Instant?, updatedAt: Instant?): FtmDocument = when (this) {
+    is RecipeDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
+    is ShoppingListDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
     is NoteDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
     is SettingsDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
 }
@@ -127,6 +131,8 @@ fun FtmDocument.withOrganisation(
     color: String? = this.color,
     tags: List<String> = this.tags,
 ): FtmDocument = when (this) {
+    is RecipeDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
+    is ShoppingListDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
     is NoteDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
     is SettingsDocument -> this
 }

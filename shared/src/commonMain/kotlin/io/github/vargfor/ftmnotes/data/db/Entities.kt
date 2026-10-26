@@ -90,3 +90,15 @@ data class DevicePrefEntity(
     @PrimaryKey val key: String,
     val value: String,
 )
+
+/** Displaced restore/sync versions; kept separately so the canonical document remains singular. */
+@Entity(tableName = "doc_revisions", indices = [Index(value = ["doc_id"])])
+data class DocumentRevisionEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "doc_id") val docId: String,
+    @ColumnInfo(name = "payload_json") val payloadJson: String,
+    val hlc: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "deleted_at") val deletedAt: Long?,
+    val purged: Boolean,
+)

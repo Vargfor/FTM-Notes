@@ -4,6 +4,8 @@ import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
 import io.github.vargfor.ftmnotes.core.model.SettingsDocument
+import io.github.vargfor.ftmnotes.core.model.RecipeDocument
+import io.github.vargfor.ftmnotes.core.model.ShoppingListDocument
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -49,6 +51,8 @@ object FtmFormat {
     internal val supported: Map<DocumentType, KSerializer<out FtmDocument>> = mapOf(
         DocumentType.Note to NoteDocument.serializer(),
         DocumentType.Settings to SettingsDocument.serializer(),
+        DocumentType.Recipe to RecipeDocument.serializer(),
+        DocumentType.ShoppingList to ShoppingListDocument.serializer(),
     )
 
     fun write(documents: List<FtmDocument>): String =

@@ -3,16 +3,21 @@ package io.github.vargfor.ftmnotes.core.format
 import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteColor
+import io.github.vargfor.ftmnotes.core.model.Ingredient
+import io.github.vargfor.ftmnotes.core.food.engine.*
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
+@Serializable
 data class ReadIssue(val severity: Severity, val path: String, val message: String) {
-    enum class Severity { Info, Warning, Error }
+    @Serializable enum class Severity { Info, Warning, Error }
 }
 
 data class ReadResult(val documents: List<FtmDocument>, val issues: List<ReadIssue>) {
@@ -100,7 +105,8 @@ object FtmReader {
         }
 
         val known = (0 until serializer.descriptor.elementsCount).map(serializer.descriptor::getElementName).toSet()
-        element.keys.filter { it != FtmFormat.DISCRIMINATOR && it !in known }.forEach { key ->
+        val aliases = if (type == DocumentType.Recipe) setOf("ingredients", "instructions") else emptySet()
+        element.keys.filter { it != FtmFormat.DISCRIMINATOR && it !in known && it !in aliases }.forEach { key ->
             issues += ReadIssue(ReadIssue.Severity.Warning, "$path.$key", "Ignored unknown field \"$key\"")
         }
 
@@ -119,6 +125,32 @@ object FtmReader {
     /** Fixes common deviations before decoding: missing checklist `kind`, non-canonical colours. */
     private fun normalise(element: JsonObject, type: DocumentType, path: String, issues: MutableList<ReadIssue>): JsonObject {
         val fields = element.filterKeys { it != FtmFormat.DISCRIMINATOR }.toMutableMap()
+        if (type == DocumentType.Recipe) {
+            if ("ingredients" in fields && "ingredientGroups" !in fields) {
+                fields["ingredientGroups"] = JsonArray(listOf(buildJsonObject { put("items", fields.getValue("ingredients")) }))
+                fields.remove("ingredients")
+                issues += ReadIssue(ReadIssue.Severity.Info, "$path.ingredients", "Grouped flat ingredients")
+            }
+            fields["ingredientGroups"]?.let { groups ->
+                if (groups is JsonArray) fields["ingredientGroups"] = JsonArray(groups.mapIndexed { gi, group ->
+                    if (group !is JsonObject) group else JsonObject(group.toMutableMap().apply {
+                        (group["items"] as? JsonArray)?.let { items -> put("items", JsonArray(items.mapIndexed { ii, item -> normaliseIngredient(item, "$path.ingredientGroups[$gi].items[$ii]", issues) })) }
+                    })
+                })
+            }
+            val steps = fields["steps"] ?: fields.remove("instructions")
+            if (steps is JsonArray) fields["steps"] = JsonArray(steps.map { if (it is JsonPrimitive && it.isString) buildJsonObject { put("text", it.content) } else it })
+            (fields["servings"] as? JsonPrimitive)?.let { value ->
+                val amount = AmountParser.prefix(value.content)
+                if (amount != null) fields["servings"] = buildJsonObject { put("amount", amount.quantity.min); if (amount.remainder.isNotBlank()) put("label", amount.remainder) }
+            }
+        }
+        if (type == DocumentType.ShoppingList) {
+            (fields["items"] as? JsonArray)?.let { items -> fields["items"] = JsonArray(items.mapIndexed { i, item ->
+                if (item is JsonPrimitive && item.isString) FtmFormat.writer.encodeToJsonElement(io.github.vargfor.ftmnotes.core.model.ShoppingItem.serializer(), ShoppingLists.quickAdd(item.content))
+                else normaliseIngredient(item, "$path.items[$i]", issues)
+            }) }
+        }
 
         if (type == DocumentType.Note && "kind" !in fields && (fields["items"] as? JsonArray)?.isNotEmpty() == true) {
             fields["kind"] = JsonPrimitive("checklist")
@@ -142,6 +174,28 @@ object FtmReader {
                         "Unknown colour \"$rawColor\"; using no colour. Use one of: ${NoteColor.entries.joinToString { it.wire }}",
                     )
                 }
+            }
+        }
+        return JsonObject(fields)
+    }
+
+    private fun normaliseIngredient(element: JsonElement, path: String, issues: MutableList<ReadIssue>): JsonElement {
+        if (element is JsonPrimitive && element.isString) {
+            issues += ReadIssue(ReadIssue.Severity.Info, path, "Parsed ingredient text")
+            return FtmFormat.writer.encodeToJsonElement(Ingredient.serializer(), IngredientParser.parse(element.content))
+        }
+        if (element !is JsonObject) return element
+        val fields = element.toMutableMap()
+        (fields["unit"] as? JsonPrimitive)?.content?.let { raw ->
+            Units.find(raw)?.let { unit -> if (unit.id != raw) {
+                fields["unit"] = JsonPrimitive(unit.id)
+                issues += ReadIssue(ReadIssue.Severity.Info, "$path.unit", "Normalised unit \"$raw\"")
+            } }
+        }
+        (fields["quantity"] as? JsonPrimitive)?.takeIf { it.isString }?.let { raw ->
+            AmountParser.parse(raw.content)?.let { quantity ->
+                fields["quantity"] = FtmFormat.writer.encodeToJsonElement(QuantitySerializer, quantity)
+                issues += ReadIssue(ReadIssue.Severity.Info, "$path.quantity", "Parsed quantity \"${raw.content}\"")
             }
         }
         return JsonObject(fields)

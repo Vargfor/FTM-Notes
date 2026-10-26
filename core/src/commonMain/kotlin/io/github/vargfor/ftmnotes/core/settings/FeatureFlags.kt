@@ -4,6 +4,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.JsonObject
+import io.github.vargfor.ftmnotes.core.food.engine.*
 
 /** Where a flag's value lives. */
 enum class FlagScope {
@@ -26,6 +29,24 @@ interface WireValue {
 sealed class FeatureFlag<T>(val id: String, val default: T, val scope: FlagScope) {
     abstract fun encode(value: T): JsonElement
     abstract fun decode(json: JsonElement): T?
+
+    class Text(id: String, default: String, scope: FlagScope) : FeatureFlag<String>(id, default, scope) {
+        override fun encode(value: String): JsonElement = JsonPrimitive(value)
+        override fun decode(json: JsonElement): String? = (json as? JsonPrimitive)?.takeIf { it.isString }?.content
+    }
+    class Number(id: String, default: Double, scope: FlagScope) : FeatureFlag<Double>(id, default, scope) {
+        override fun encode(value: Double): JsonElement = JsonPrimitive(value)
+        override fun decode(json: JsonElement): Double? = (json as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() && it > 0 }
+    }
+    class DecimalMap(id: String, scope: FlagScope) : FeatureFlag<Map<String, Double>>(id, emptyMap(), scope) {
+        override fun encode(value: Map<String, Double>): JsonElement = JsonObject(value.mapValues { JsonPrimitive(it.value) })
+        override fun decode(json: JsonElement): Map<String, Double>? {
+            val obj = json as? JsonObject ?: return null
+            val values = obj.mapValues { (_, value) -> (value as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() && it > 0 } }
+            if (values.values.any { it == null }) return null
+            return values.mapValues { it.value!! }
+        }
+    }
 
     class Bool(id: String, default: Boolean, scope: FlagScope) : FeatureFlag<Boolean>(id, default, scope) {
         override fun encode(value: Boolean): JsonElement = JsonPrimitive(value)
@@ -86,6 +107,23 @@ enum class NotesLayout(override val wire: String) : WireValue {
 
 /** Every flag the app knows. Unknown keys found in storage (e.g. from a newer version) are kept, not dropped. */
 object Flags {
+    val foodUnits = FeatureFlag.Choice("food.units", UnitMode.Metric, FlagScope.Synced, UnitMode.entries)
+    val foodVolume = FeatureFlag.Choice("food.volume", MetricVolume.Auto, FlagScope.Synced, MetricVolume.entries)
+    val foodKeepSpoons = FeatureFlag.Bool("food.keep_spoons", true, FlagScope.Synced)
+    val foodUseDensities = FeatureFlag.Bool("food.use_densities", true, FlagScope.Synced)
+    val foodDensities = FeatureFlag.DecimalMap("food.densities", FlagScope.Synced)
+    val foodRounding = FeatureFlag.Choice("food.rounding", FoodRounding.Kitchen, FlagScope.Synced, FoodRounding.entries)
+    val foodRoundingStep = FeatureFlag.Number("food.rounding_step", 1.0, FlagScope.Synced)
+    val foodStepConversions = FeatureFlag.Bool("food.step_conversions", true, FlagScope.Synced)
+    val foodFanHint = FeatureFlag.Bool("food.fan_hint", false, FlagScope.Synced)
+    val foodKeepAwake = FeatureFlag.Bool("food.keep_awake", true, FlagScope.Synced)
+    val foodIngredientChecks = FeatureFlag.Bool("food.ingredient_checks", true, FlagScope.Synced)
+    val foodTimers = FeatureFlag.Bool("food.timers", true, FlagScope.Synced)
+    val foodMultipleLists = FeatureFlag.Bool("food.multiple_lists", false, FlagScope.Synced)
+    val backupEnabled = FeatureFlag.Bool("backup.enabled", false, FlagScope.Device)
+    val backupFolder = FeatureFlag.Text("backup.folder", "", FlagScope.Device)
+    val backupRetention = FeatureFlag.IntChoice("backup.retention", 7, FlagScope.Device, listOf(7, 30, 90))
+    val tabOrder = FeatureFlag.Text("app.tabs.order", "training,food,notes", FlagScope.Synced)
     // Appearance: per device, since a phone and a tablet may want different looks.
     val theme = FeatureFlag.Choice("app.theme", ThemeMode.System, FlagScope.Device, ThemeMode.entries)
     val pureBlack = FeatureFlag.Bool("app.theme.pure_black", false, FlagScope.Device)
@@ -114,6 +152,9 @@ object Flags {
     val all: List<FeatureFlag<*>> = listOf(
         theme, pureBlack, trainingTab, foodTab, notesTab, startTab,
         notesLayout, checkedSection, swipeToArchive, trashRetentionDays,
+        backupEnabled, backupFolder, backupRetention, tabOrder,
+        foodUnits, foodVolume, foodKeepSpoons, foodUseDensities, foodDensities, foodRounding, foodRoundingStep,
+        foodStepConversions, foodFanHint, foodKeepAwake, foodIngredientChecks, foodTimers, foodMultipleLists,
     )
 
     fun byId(id: String): FeatureFlag<*>? = all.firstOrNull { it.id == id }

@@ -40,5 +40,8 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.okio.fakefilesystem)
         }
+        jvmTest.dependencies {
+            implementation("com.networknt:json-schema-validator:1.5.9")
+        }
     }
 }

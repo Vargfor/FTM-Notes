@@ -4,6 +4,8 @@ import android.app.UiModeManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
+import io.github.vargfor.ftmnotes.platform.androidPlatformBridge
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -16,6 +18,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        androidPlatformBridge().bind(this)
+        if (savedInstanceState == null) androidPlatformBridge().receive(intent)
         // Settings were already being read since Application.onCreate; usually this doesn't wait at all.
         runBlocking { awaitStartupSettings() }
 
@@ -39,6 +43,17 @@ class MainActivity : ComponentActivity() {
                 }
             })
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        androidPlatformBridge().receive(intent)
+    }
+
+    override fun onDestroy() {
+        androidPlatformBridge().unbind(this)
+        super.onDestroy()
     }
 
     private companion object {

@@ -7,6 +7,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.vargfor.ftmnotes.resources.Res
 import io.github.vargfor.ftmnotes.resources.action_back
 import io.github.vargfor.ftmnotes.resources.action_search
@@ -25,11 +26,13 @@ fun SectionTopBar(
     onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
+    extraActions: @Composable () -> Unit = {},
 ) {
     LargeFlexibleTopAppBar(
-        title = { Text(title) },
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         subtitle = { Text(subtitle) },
         actions = {
+            extraActions()
             IconButton(onClick = onOpenSearch) {
                 Icon(painterResource(Res.drawable.ic_search), contentDescription = stringResource(Res.string.action_search))
             }
@@ -45,7 +48,7 @@ fun SectionTopBar(
 @Composable
 fun BackTopBar(title: String, onBack: () -> Unit, actions: @Composable () -> Unit = {}) {
     TopAppBar(
-        title = { Text(title) },
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = { BackButton(onBack) },
         actions = { actions() },
     )

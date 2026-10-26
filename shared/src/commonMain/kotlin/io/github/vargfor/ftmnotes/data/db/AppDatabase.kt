@@ -12,9 +12,9 @@ import kotlinx.coroutines.IO
  * Schema history:
  * - v1 (Phase 0): documents + device_prefs. Only ever held test data.
  * - v2 (Phase 1a): tags, full-text search, import batches, attachments, list projection, purge flag.
+ * - v3 (Phase 1): revision history, with a tested non-destructive v2 migration.
  *
- * Until the Phase 1a schema freeze, bumps may be destructive. After it, every change needs a
- * migration plus a migration test.
+ * From v2 onward, every schema change needs a non-destructive migration and a migration test.
  */
 @Database(
     entities = [
@@ -23,8 +23,9 @@ import kotlinx.coroutines.IO
         ImportBatchEntity::class,
         AttachmentEntity::class,
         DevicePrefEntity::class,
+        DocumentRevisionEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @ConstructedBy(AppDatabaseConstructor::class)
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun importBatchDao(): ImportBatchDao
     abstract fun attachmentDao(): AttachmentDao
     abstract fun devicePrefDao(): DevicePrefDao
+    abstract fun revisionDao(): DocumentRevisionDao
 
     companion object {
         const val FILE_NAME = "ftm-notes.db"
@@ -50,5 +52,6 @@ fun RoomDatabase.Builder<AppDatabase>.buildFtmDatabase(): AppDatabase =
     setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
         .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1) // v1 only ever held test data
+        .addMigrations(Migration2To3)
         .addCallback(FtsCallback)
         .build()

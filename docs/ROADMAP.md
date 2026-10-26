@@ -5,7 +5,8 @@ numbered **runs** — roughly one working session each — so "the next run" alw
 
 Every run ends with:
 - all tests green: `./gradlew :core:jvmTest :shared:desktopTest :shared:testAndroidHostTest`
-- the iOS compile check: `./gradlew :core:compileTestKotlinIosArm64 :shared:compileKotlinIosArm64`
+- common-code iOS compatibility stays checked in CI; local check (optional while iOS is paused):
+  `./gradlew :core:compileTestKotlinIosArm64 :shared:compileKotlinIosArm64`
 - `./gradlew :androidApp:assembleDebug`, then an emulator walkthrough (phone, plus tablet for list-detail)
 - a short report, after which Henrik commits.
 
@@ -16,6 +17,34 @@ Every run ends with:
 | ✅ Phase 0 | Foundation, app ID `io.github.vargfor.ftmnotes` |
 | ✅ P1.0 | Spikes (editor, zip writer, iOS cross-compile), CI fixed for `master` |
 | ✅ P1a step 1 (+ most of step 2) | Data-loss fixes; DB v2 (tags, search, trash/purge, import batches) |
+| ✅ Runs A–D implementation | Settings, rich text/checklists, organisation, search, archive/trash, Keep preview/import/undo, complete ZIP backup/restore; tested DB v2→v3 migration |
+| ✅ Runs E–F implementation | Daily folder backups, retention/status/recovery, FTM/AI import/export, camera/gallery attachments, bulk actions, sharing, shortcuts, settings search and screenshot coverage |
+| ✅ Runs G–I implementation and automated exit criteria | Recipes, conversion/scaling, cook mode/timers, shopping lists, URL/Paprika imports, recipe AI prompt and schemas |
+| Pending Phase 1 acceptance | Import Henrik's real Keep Takeout; verify Drive/OneDrive backup folders on his phone |
+
+## Verification — 2026-10-26
+
+The implementation is present in the working tree; commits remain Henrik's responsibility.
+Phase 1's personal-data/provider checks below still gate claiming both phases complete and starting Training.
+
+| Check | Result |
+|---|---|
+| Domain, desktop and Android host tests | 189 passing test executions; includes 252 ingredient parsing cases and conversion/scaling properties |
+| Format and import coverage | Note/recipe prompts and all three content schemas validated; JSON-LD object/array/graph and Paprika fixtures pass |
+| Persistence coverage | Populated v2→v3 migration, import rollback/duplicates/undo, corrupt archives, complete restore, conflicts and backup retention/failure recovery pass |
+| Lifecycle and navigation | Autosave/final flush, concurrent organisation/trash, shopping undo/redo, persisted cook progress/deadlines and independent tablet detail panes pass |
+| UI captures | 40 desktop PNGs: notes list/editor, recipe, cook mode and shopping, light/dark, font 1×/2×, phone/tablet. Saved under `shared/build/reports/screenshots`; uploaded by CI. These are reviewed captures with semantic checks, not pixel-golden comparisons |
+| Build compatibility | Android debug assembly and core/shared iOS Arm64 compile checks pass; iOS runtime remains paused |
+| Android phone emulator | Recipe create/save/reopen/scaling, cook mode, gallery and camera attachment, incoming text share, persisted local backup folder and ZIP creation verified |
+| Android timer | Notification observed after backgrounding and `am kill`; real-device screen-off/Doze timing remains a manual check |
+| Android tablet emulator | Notes and recipes open beside their lists; incoming share and new-checklist action verified. Tab/detail isolation has a dedicated UI regression test |
+| Android local backup provider | Two ZIPs written through persisted directory access; exported photo bytes match their SHA-256 reference |
+| Real Keep Takeout | Pending: no export available in the workspace or Downloads; fixture and split-archive tests pass |
+| Drive/OneDrive on Henrik's phone | Pending: no physical phone/provider setup available for this run |
+
+Default recipe display is metric with spoon measures retained. Automatic backups start after folder
+selection, run daily, and retain seven successful copies. Existing shopping lists remain accessible
+when multiple-list creation is disabled. No destructive migration is permitted from DB v2 or later.
 
 ## Runs
 

@@ -1,14 +1,11 @@
 package io.github.vargfor.ftmnotes.feature.notes
 
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.vargfor.ftmnotes.core.model.NoteDocument
+import com.mohamedrejeb.richeditor.model.RichTextState
+import io.github.vargfor.ftmnotes.core.model.*
+import io.github.vargfor.ftmnotes.core.notes.*
 import io.github.vargfor.ftmnotes.data.DocumentRepository
 import io.github.vargfor.ftmnotes.di.AppScope
 import kotlinx.coroutines.FlowPreview
@@ -17,79 +14,111 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 
-/**
- * Plain-text note editor with autosave. A new note (id not yet in the database) is only written
- * once it has content, so opening and closing "New note" never leaves empty notes behind.
- *
- * Phase 1 replaces the body field with the rich-text editor.
- */
+/** Loading rich text never rewrites the original. The final save outlives the screen. */
 @OptIn(FlowPreview::class)
 class NoteEditorViewModel(
     private val noteId: String,
     private val repository: DocumentRepository,
     private val appScope: AppScope,
 ) : ViewModel() {
-
-    val title = TextFieldState()
-    val content = TextFieldState()
-
+    var draft by mutableStateOf(NoteDocument(id = noteId))
+        private set
+    val rich = RichTextState()
     var isLoaded by mutableStateOf(false)
         private set
-
-    /** True when this editor was opened for a note that doesn't exist yet. */
     var isNew by mutableStateOf(false)
         private set
-
+    var error by mutableStateOf<String?>(null)
+        private set
+    var canUndo by mutableStateOf(false)
+        private set
+    var canRedo by mutableStateOf(false)
+        private set
+    private val history = UndoStack<NoteDocument>()
     private val saveLock = Mutex()
-    private var existsInDb = false
-    /** Last title/content written (or loaded): the baseline that decides whether anything changed. */
-    private var baseline: Pair<String, String>? = null
+    private var baseline = draft
+    private var richBaseline = ""
+    private var exists = false
 
     init {
         viewModelScope.launch {
-            val existing = repository.get(noteId)?.document as? NoteDocument
-            existsInDb = existing != null
-            isNew = existing == null
-            existing?.let {
-                title.setTextAndPlaceCursorAtEnd(it.title)
-                content.setTextAndPlaceCursorAtEnd(it.content)
-                baseline = it.title to it.content
-            }
-            isLoaded = true
-
-            snapshotFlow { title.text.toString() to content.text.toString() }
-                .drop(1) // the initial load isn't an edit
-                .debounce(AutosaveDebounceMillis)
-                .collect { (title, content) -> persist(title, content) }
+            try {
+                val note = repository.get(noteId)?.document as? NoteDocument
+                exists = note != null
+                isNew = !exists
+                render(note?.copy(items = note.items.filterNot { it.deleted }) ?: draft)
+                baseline = draft
+                isLoaded = true
+                launch {
+                    snapshotFlow { rich.toMarkdown() }.collect { markdown ->
+                        if (markdown != richBaseline && draft.kind == NoteKind.Text) {
+                            richBaseline = markdown
+                            edit(draft.copy(content = markdown), "body")
+                        }
+                    }
+                }
+                snapshotFlow { draft }.drop(1).debounce(300).collect { persist() }
+            } catch (e: Exception) { error = e.message }
         }
     }
 
-    override fun onCleared() {
-        // Flush the latest text even if the debounce window hasn't elapsed.
-        if (!isLoaded) return
-        val latestTitle = title.text.toString()
-        val latestContent = content.text.toString()
-        appScope.launch { persist(latestTitle, latestContent) }
+    fun edit(note: NoteDocument, key: String? = null) {
+        if (note == draft) return
+        history.record(draft, key, Clock.System.now().toEpochMilliseconds())
+        draft = note
+        updateHistory()
     }
 
-    private suspend fun persist(title: String, content: String) = saveLock.withLock {
-        val edited = title.trim() to content
+    fun changeKind() {
+        val next = if (draft.kind == NoteKind.Text) {
+            draft.copy(kind = NoteKind.Checklist, items = ChecklistOps.fromText(draft.content))
+        } else draft.copy(kind = NoteKind.Text, content = ChecklistOps.toText(draft.items))
+        edit(next)
+        render(next)
+        flush()
+    }
+
+    fun items(transform: (List<ChecklistItem>) -> List<ChecklistItem>, key: String? = null) {
+        edit(draft.copy(items = transform(draft.items)), key)
+        if (key == null) flush()
+    }
+
+    fun undo() { syncRich(); history.undo(draft)?.let(::render); updateHistory(); flush() }
+    fun redo() { history.redo(draft)?.let(::render); updateHistory(); flush() }
+    fun flush() { if (isLoaded) { syncRich(); appScope.launch { persist() } } }
+    suspend fun flushNow(): Boolean { if (isLoaded) { syncRich(); persist() }; return error == null }
+    override fun onCleared() = flush()
+
+    private fun render(note: NoteDocument) {
+        draft = note
+        rich.setMarkdown(note.content)
+        richBaseline = rich.toMarkdown()
+    }
+
+    private fun updateHistory() { canUndo = history.canUndo; canRedo = history.canRedo }
+
+    private fun syncRich() {
+        val markdown = rich.toMarkdown()
+        if (draft.kind == NoteKind.Text && markdown != richBaseline) {
+            richBaseline = markdown
+            edit(draft.copy(content = markdown), "body")
+        }
+    }
+
+    private suspend fun persist() = saveLock.withLock {
+        val edited = draft.copy(title = draft.title.trim())
         if (edited == baseline) return@withLock
-        if (!existsInDb) {
-            if (title.isBlank() && content.isBlank()) return@withLock
-            repository.save(NoteDocument(id = noteId, title = edited.first, content = edited.second))
-            existsInDb = true
-        } else {
-            // Read-modify-write on the stored version: keeps pin/colour/tags changed elsewhere.
-            repository.update(noteId) { doc ->
-                (doc as? NoteDocument)?.copy(title = edited.first, content = edited.second) ?: doc
+        if (!exists && edited.title.isBlank() && edited.content.isBlank() &&
+            ChecklistOps.isBlank(edited.items) && edited.attachments.isEmpty()) return@withLock
+        try {
+            if (!exists) { repository.save(edited); exists = true }
+            else repository.update(noteId) { current ->
+                if (current is NoteDocument) mergeNoteEdits(current, baseline, edited) else current
             }
-        }
-        baseline = edited
-    }
-
-    private companion object {
-        const val AutosaveDebounceMillis = 300L
+            baseline = edited
+            error = null
+        } catch (e: Exception) { error = e.message }
     }
 }

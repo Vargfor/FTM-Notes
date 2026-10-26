@@ -23,8 +23,15 @@ okio = "3.18.2"
 reorderable = "3.1.0"
 richeditor = "1.2.1"
 room3 = "3.0.3"
+work = "2.12.0"
+ktor = "3.6.0"
 
 [libraries]
+androidx-work = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 # Kotlin / KotlinX
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }

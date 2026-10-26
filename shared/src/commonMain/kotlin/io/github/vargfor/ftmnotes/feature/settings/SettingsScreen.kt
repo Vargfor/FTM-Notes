@@ -1,166 +1,129 @@
 package io.github.vargfor.ftmnotes.feature.settings
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.github.vargfor.ftmnotes.core.settings.Flags
-import io.github.vargfor.ftmnotes.core.settings.SectionId
-import io.github.vargfor.ftmnotes.core.settings.ThemeMode
-import io.github.vargfor.ftmnotes.designsystem.components.BackTopBar
-import io.github.vargfor.ftmnotes.resources.Res
-import io.github.vargfor.ftmnotes.resources.settings_appearance
-import io.github.vargfor.ftmnotes.resources.settings_pure_black
-import io.github.vargfor.ftmnotes.resources.settings_pure_black_summary
-import io.github.vargfor.ftmnotes.resources.settings_sections
-import io.github.vargfor.ftmnotes.resources.settings_sections_summary
-import io.github.vargfor.ftmnotes.resources.settings_start_tab
-import io.github.vargfor.ftmnotes.resources.settings_theme
-import io.github.vargfor.ftmnotes.resources.settings_theme_dark
-import io.github.vargfor.ftmnotes.resources.settings_theme_light
-import io.github.vargfor.ftmnotes.resources.settings_theme_system
-import io.github.vargfor.ftmnotes.resources.settings_title
-import io.github.vargfor.ftmnotes.resources.tab_food
-import io.github.vargfor.ftmnotes.resources.tab_notes
-import io.github.vargfor.ftmnotes.resources.tab_training
-import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.stringResource
+import io.github.vargfor.ftmnotes.core.settings.*
+import io.github.vargfor.ftmnotes.designsystem.components.*
+import io.github.vargfor.ftmnotes.resources.*
+import org.jetbrains.compose.resources.*
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Settings v1: appearance and sections. Notes, backup and the rest arrive with their features. */
+private data class SettingsEntry(val label: String, val content: @Composable () -> Unit)
+
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = koinViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenImport: () -> Unit = {}, onOpenBackups: () -> Unit = {}, onOpenFoodSettings: () -> Unit = {}, viewModel: SettingsViewModel = koinViewModel()) {
     val settings by viewModel.snapshot.collectAsStateWithLifecycle()
     val tabs = settings.tabLayout()
-
+    var query by rememberSaveable { mutableStateOf("") }
+    val appearance = stringResource(Res.string.settings_appearance)
+    val notes = stringResource(Res.string.settings_notes)
+    val sections = stringResource(Res.string.settings_sections)
+    val entries = mutableListOf<SettingsEntry>()
+    entries += SettingsEntry(appearance + " " + stringResource(Res.string.settings_theme)) {
+        ChoiceRow(stringResource(Res.string.settings_theme), ThemeMode.entries, settings[Flags.theme],
+            { stringResource(it.label) }, { viewModel.set(Flags.theme, it) })
+    }
+    entries += SettingsEntry(appearance + " " + stringResource(Res.string.settings_pure_black)) {
+        SwitchRow(stringResource(Res.string.settings_pure_black), settings[Flags.pureBlack], { viewModel.set(Flags.pureBlack, it) },
+            stringResource(Res.string.settings_pure_black_summary))
+    }
+    val order = (settings[Flags.tabOrder].split(',').mapNotNull { wire -> SectionId.entries.firstOrNull { it.wire == wire } } + SectionId.entries).distinct()
+    order.forEachIndexed { index, section ->
+        entries += SettingsEntry(sections + " " + stringResource(section.label)) {
+            val visible = section in tabs.tabs
+            SwitchRow(stringResource(section.label), visible, { viewModel.set(Flags.tabVisible(section), it) }, enabled = !visible || tabs.tabs.size > 1)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
+                TextButton({
+                    val next = order.toMutableList().apply { add(index - 1, removeAt(index)) }
+                    viewModel.set(Flags.tabOrder, next.joinToString(",") { it.wire })
+                }, enabled = index > 0) { Text(stringResource(Res.string.action_move_up)) }
+                TextButton({
+                    val next = order.toMutableList().apply { add(index + 1, removeAt(index)) }
+                    viewModel.set(Flags.tabOrder, next.joinToString(",") { it.wire })
+                }, enabled = index < order.lastIndex) { Text(stringResource(Res.string.action_move_down)) }
+            }
+        }
+    }
+    entries += SettingsEntry(sections + " " + stringResource(Res.string.settings_start_tab)) {
+        ChoiceRow(stringResource(Res.string.settings_start_tab), tabs.tabs, tabs.start,
+            { stringResource(it.label) }, { viewModel.set(Flags.startTab, it) })
+    }
+    entries += SettingsEntry(notes + " " + stringResource(Res.string.settings_layout)) {
+        ChoiceRow(stringResource(Res.string.settings_layout), NotesLayout.entries, settings[Flags.notesLayout],
+            { stringResource(if (it == NotesLayout.Grid) Res.string.notes_grid else Res.string.notes_list) }, { viewModel.set(Flags.notesLayout, it) })
+    }
+    entries += SettingsEntry(notes + " " + stringResource(Res.string.settings_checked_section)) {
+        SwitchRow(stringResource(Res.string.settings_checked_section), settings[Flags.checkedSection], { viewModel.set(Flags.checkedSection, it) })
+    }
+    entries += SettingsEntry(notes + " " + stringResource(Res.string.settings_swipe_archive)) {
+        SwitchRow(stringResource(Res.string.settings_swipe_archive), settings[Flags.swipeToArchive], { viewModel.set(Flags.swipeToArchive, it) })
+    }
+    entries += SettingsEntry(notes + " " + stringResource(Res.string.settings_trash_retention)) {
+        ChoiceRow(stringResource(Res.string.settings_trash_retention), Flags.trashRetentionDays.options, settings[Flags.trashRetentionDays],
+            { if (it == Flags.NEVER) stringResource(Res.string.backup_never) else stringResource(Res.string.settings_days, it) },
+            { viewModel.set(Flags.trashRetentionDays, it) })
+    }
+    entries += SettingsEntry(stringResource(Res.string.action_import)) {
+        ListItem(headlineContent = { Text(stringResource(Res.string.action_import)) },
+            trailingContent = { TextButton(onOpenImport) { Text(stringResource(Res.string.action_import)) } })
+    }
+    entries += SettingsEntry(stringResource(Res.string.food_settings)) {
+        ListItem(headlineContent = { Text(stringResource(Res.string.food_settings)) },
+            trailingContent = { TextButton(onOpenFoodSettings) { Text(stringResource(Res.string.action_settings)) } })
+    }
+    entries += SettingsEntry(stringResource(Res.string.backup_title)) {
+        ListItem(headlineContent = { Text(stringResource(Res.string.backup_title)) },
+            trailingContent = { TextButton(onOpenBackups) { Text(stringResource(Res.string.action_backups)) } })
+    }
     Scaffold(topBar = { BackTopBar(stringResource(Res.string.settings_title), onBack) }) { padding ->
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp)) {
-            item { SectionHeader(stringResource(Res.string.settings_appearance)) }
-            item {
-                ChoiceRow(
-                    label = stringResource(Res.string.settings_theme),
-                    options = ThemeMode.entries,
-                    selected = settings[Flags.theme],
-                    optionLabel = { stringResource(it.label) },
-                    onSelect = { viewModel.set(Flags.theme, it) },
-                )
-            }
-            item {
-                SwitchRow(
-                    title = stringResource(Res.string.settings_pure_black),
-                    summary = stringResource(Res.string.settings_pure_black_summary),
-                    checked = settings[Flags.pureBlack],
-                    onCheckedChange = { viewModel.set(Flags.pureBlack, it) },
-                )
-            }
-
-            item { SectionHeader(stringResource(Res.string.settings_sections), stringResource(Res.string.settings_sections_summary)) }
-            SectionId.entries.forEach { section ->
-                item(key = section.wire) {
-                    val visible = section in tabs.tabs
-                    SwitchRow(
-                        title = stringResource(section.label),
-                        checked = visible,
-                        // The last visible section can't be hidden: the app needs somewhere to open.
-                        enabled = !visible || tabs.tabs.size > 1,
-                        onCheckedChange = { viewModel.set(Flags.tabVisible(section), it) },
-                    )
-                }
-            }
-            if (tabs.tabs.size > 1) {
-                item {
-                    ChoiceRow(
-                        label = stringResource(Res.string.settings_start_tab),
-                        options = tabs.tabs,
-                        selected = tabs.start,
-                        optionLabel = { stringResource(it.label) },
-                        onSelect = { viewModel.set(Flags.startTab, it) },
-                    )
-                }
+            item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(16.dp), label = { Text(stringResource(Res.string.settings_search)) }, singleLine = true) }
+            items(entries.filter { it.label.contains(query, ignoreCase = true) }, key = { it.label }) { row ->
+                Text(row.label, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                row.content()
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp))
             }
         }
     }
 }
 
-private val ThemeMode.label: StringResource
-    get() = when (this) {
-        ThemeMode.System -> Res.string.settings_theme_system
-        ThemeMode.Light -> Res.string.settings_theme_light
-        ThemeMode.Dark -> Res.string.settings_theme_dark
-    }
-
-private val SectionId.label: StringResource
-    get() = when (this) {
-        SectionId.Training -> Res.string.tab_training
-        SectionId.Food -> Res.string.tab_food
-        SectionId.Notes -> Res.string.tab_notes
-    }
-
-@Composable
-private fun SectionHeader(title: String, summary: String? = null) {
-    ListItem(
-        headlineContent = { Text(title, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall) },
-        supportingContent = summary?.let { { Text(it) } },
-        modifier = Modifier.padding(top = 8.dp),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
+private val ThemeMode.label: StringResource get() = when (this) {
+    ThemeMode.System -> Res.string.settings_theme_system
+    ThemeMode.Light -> Res.string.settings_theme_light
+    ThemeMode.Dark -> Res.string.settings_theme_dark
+}
+private val SectionId.label: StringResource get() = when (this) {
+    SectionId.Training -> Res.string.tab_training
+    SectionId.Food -> Res.string.tab_food
+    SectionId.Notes -> Res.string.tab_notes
 }
 
 @Composable
-private fun SwitchRow(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    summary: String? = null,
-    enabled: Boolean = true,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = summary?.let { { Text(it) } },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
-        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
+internal fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, summary: String? = null, enabled: Boolean = true) {
+    ListItem(headlineContent = { Text(title) }, supportingContent = summary?.let { { Text(it) } },
+        trailingContent = { Switch(checked, null, enabled = enabled) },
+        modifier = Modifier.toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent))
 }
 
 @Composable
-private fun <T> ChoiceRow(
-    label: String,
-    options: List<T>,
-    selected: T,
-    optionLabel: @Composable (T) -> String,
-    onSelect: (T) -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(label) },
-        supportingContent = {
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                options.forEachIndexed { index, option ->
-                    SegmentedButton(
-                        selected = option == selected,
-                        onClick = { onSelect(option) },
-                        shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                    ) { Text(optionLabel(option)) }
-                }
+internal fun <T> ChoiceRow(label: String, options: List<T>, selected: T, optionLabel: @Composable (T) -> String, onSelect: (T) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, item ->
+                SegmentedButton(selected == item, { onSelect(item) }, shape = SegmentedButtonDefaults.itemShape(index, options.size)) { Text(optionLabel(item)) }
             }
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
+        }
+    }
 }

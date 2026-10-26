@@ -1,6 +1,8 @@
 package io.github.vargfor.ftmnotes.data
 
 import io.github.vargfor.ftmnotes.core.format.FtmFormat
+import io.github.vargfor.ftmnotes.core.backup.BackupRecord
+import io.github.vargfor.ftmnotes.core.backup.stampChecklistEdits
 import io.github.vargfor.ftmnotes.core.format.contentHash
 import io.github.vargfor.ftmnotes.core.format.listProjection
 import io.github.vargfor.ftmnotes.core.format.plainText
@@ -9,6 +11,10 @@ import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.Hlc
 import io.github.vargfor.ftmnotes.core.model.Ids
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
+import io.github.vargfor.ftmnotes.core.model.RecipeDocument
+import io.github.vargfor.ftmnotes.core.model.ShoppingListDocument
+import io.github.vargfor.ftmnotes.core.food.engine.normalisedContent
+import io.github.vargfor.ftmnotes.core.food.engine.stampShoppingEdits
 import io.github.vargfor.ftmnotes.core.model.SettingsDocument
 import io.github.vargfor.ftmnotes.core.model.withMeta
 import io.github.vargfor.ftmnotes.core.model.withOrganisation
@@ -37,6 +43,8 @@ data class StoredDocument(
     val deletedAt: Instant?,
     val hlc: String,
 )
+
+data class SearchFilters(val type: DocumentType? = null, val tag: String? = null, val color: String? = null, val includeArchived: Boolean = true)
 
 /** A document arriving with its own history (backup restore now, sync later); stored as-is. */
 data class IncomingDocument(
@@ -79,9 +87,9 @@ class DocumentRepository(
 
     /** Live full-text search: re-runs whenever any document changes. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun search(query: String): Flow<List<DocumentListRow>> {
+    fun search(query: String, filters: SearchFilters = SearchFilters()): Flow<List<DocumentListRow>> {
         val match = FtsQuery.build(query) ?: return flowOf(emptyList())
-        return dao.observeChanges().mapLatest { dao.search(match) }
+        return dao.observeChanges().mapLatest { dao.search(match, filters.type?.wire, filters.tag?.let(::tagKey), filters.color, filters.includeArchived) }
     }
 
     fun observeTagCounts(): Flow<List<TagCount>> = dao.observeTagCounts()
@@ -159,6 +167,25 @@ class DocumentRepository(
         }
     }
 
+    /** Restores an already validated storage record, including content-free tombstones. */
+    suspend fun applyBackupRecord(record: BackupRecord) = transactor.write {
+        if (!record.purged) {
+            val payload = FtmFormat.decodeDocument(record.payloadJson)
+            applyIncoming(IncomingDocument(payload, Hlc.parse(record.hlc),
+                payload.createdAt ?: Instant.fromEpochMilliseconds(record.createdAt), payload.updatedAt ?: Instant.fromEpochMilliseconds(record.updatedAt),
+                record.deletedAt?.let(Instant::fromEpochMilliseconds), false), dirty = true)
+        } else {
+            clock.receive(Hlc.parse(record.hlc))
+            val existing = dao.get(record.id)
+            dao.upsert(DocumentEntity(record.id, record.type, "", "", record.payloadJson, FtmFormat.VERSION,
+                null, false, false, record.createdAt, record.updatedAt, record.deletedAt, true, record.hlc,
+                existing?.baseHlc, true, record.payloadJson.contentHash(), existing?.remoteRef, null,
+                "", 0, 0, null))
+            dao.deleteTags(record.id)
+            dao.deleteFts(record.id)
+        }
+    }
+
     suspend fun moveToTrash(id: String) = setTrashed(id, trashed = true)
 
     suspend fun restore(id: String) = setTrashed(id, trashed = false)
@@ -203,9 +230,21 @@ class DocumentRepository(
         createdAt: Instant,
         dirty: Boolean,
     ): Boolean {
-        val doc = normalised(document)
+        val normal = normalised(document)
+        val previous = existing?.decode() as? NoteDocument
+        val doc = when (normal) {
+            is NoteDocument -> stampChecklistEdits(previous, normal, existing?.hlc ?: "")
+            is ShoppingListDocument -> stampShoppingEdits(existing?.decode() as? ShoppingListDocument, normal, existing?.hlc ?: "")
+            else -> normal
+        }
         if (existing != null && existing.contentHash == hashOf(doc, id, createdAt)) return false
-        writeRow(id, doc, existing, createdAt, now(), clock.now(), dirty)
+        val stamp = clock.now()
+        val stamped = when (normal) {
+            is NoteDocument -> stampChecklistEdits(previous, normal, stamp.encode())
+            is ShoppingListDocument -> stampShoppingEdits(existing?.decode() as? ShoppingListDocument, normal, stamp.encode())
+            else -> normal
+        }
+        writeRow(id, stamped, existing, createdAt, now(), stamp, dirty)
         return true
     }
 
@@ -312,7 +351,9 @@ class DocumentRepository(
             .filter { it.isNotEmpty() }
             .distinctBy(::tagKey)
         val withTags = if (tags == document.tags) document else document.withOrganisation(tags = tags)
-        return if (withTags is NoteDocument && withTags.items.any { it.id == null }) {
+        return if (withTags is RecipeDocument) withTags.normalisedContent()
+        else if (withTags is ShoppingListDocument) withTags.copy(items = withTags.items.map { it.copy(id = it.id ?: Ids.newId()) })
+        else if (withTags is NoteDocument && withTags.items.any { it.id == null }) {
             withTags.copy(items = ChecklistOps.withIds(withTags.items))
         } else {
             withTags

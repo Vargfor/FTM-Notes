@@ -24,7 +24,8 @@ data class SettingsSnapshot(
     /** The tabs to show, in order, and the one the app opens on. Always at least one tab. */
     fun tabLayout(): TabLayout {
         val start = this[Flags.startTab]
-        val visible = SectionId.entries.filter { this[Flags.tabVisible(it)] }.ifEmpty { listOf(start) }
+        val order = (this[Flags.tabOrder].split(',').mapNotNull { wire -> SectionId.entries.firstOrNull { it.wire == wire } } + SectionId.entries).distinct()
+        val visible = order.filter { this[Flags.tabVisible(it)] }.ifEmpty { listOf(start) }
         return TabLayout(visible, if (start in visible) start else visible.first())
     }
 

@@ -89,8 +89,12 @@ kotlin {
             implementation(libs.filekit.core)
             implementation(libs.filekit.dialogs.compose)
             implementation(libs.filekit.coil)
+            implementation(libs.ktor.client.core)
         }
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.work)
+            implementation(libs.ktor.client.okhttp)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation(libs.koin.android)
@@ -99,6 +103,7 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.ktor.client.cio)
             }
         }
         commonTest.dependencies {
@@ -110,6 +115,7 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.compose.ui.test)
                 implementation(libs.androidx.room3.testing)
+                implementation(libs.ktor.client.mock)
             }
         }
     }
