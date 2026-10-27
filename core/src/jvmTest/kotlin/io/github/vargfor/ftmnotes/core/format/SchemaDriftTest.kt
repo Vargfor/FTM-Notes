@@ -43,7 +43,7 @@ class SchemaDriftTest {
     }
 
     @Test fun noteAndRecipePromptsValidateAndRoundTrip() {
-        for (type in listOf("note", "recipe")) {
+        for (type in listOf("note", "recipe", "shopping_list", "exercise", "workout_template", "workout_session", "training_plan")) {
             val prompt = resource("AI_PROMPT_" + type + ".md")
             val validator = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(resource(type + ".schema.json"))
             val fence = 96.toChar().toString().repeat(3)
@@ -53,7 +53,9 @@ class SchemaDriftTest {
                 val read = FtmReader.read(example)
                 assertTrue(read.errors.isEmpty(), read.issues.toString())
                 Json.parseToJsonElement(example).jsonObject["documents"]!!.jsonArray.forEach { doc ->
-                    assertTrue(validator.validate(mapper.readTree(doc.toString())).isEmpty(), doc.toString())
+                    val documentValidator = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(resource(doc.jsonObject["type"]!!.jsonPrimitive.content + ".schema.json"))
+                    val errors = documentValidator.validate(mapper.readTree(doc.toString()))
+                    assertTrue(errors.isEmpty(), errors.toString() + ": " + doc.toString())
                 }
                 assertEquals(read.documents, FtmReader.read(FtmFormat.write(read.documents)).documents)
             }
@@ -74,6 +76,36 @@ class SchemaDriftTest {
                 assertTrue(validator.validate(mapper.readTree(encoded)).isEmpty(), encoded)
             }
         }
+    }
+
+    @Test fun trainingSchemasDescribeAllDocumentsAndNestedFields() {
+        val documents = listOf(ExerciseDocument(), WorkoutTemplateDocument(), WorkoutSessionDocument(), TrainingPlanDocument())
+        val full = Json(FtmFormat.writer) { encodeDefaults = true; explicitNulls = true }
+        documents.forEach { doc ->
+            val text = resource(doc.documentType.wire + ".schema.json")
+            val schema = Json.parseToJsonElement(text).jsonObject
+            val descriptor = when(doc) {
+                is ExerciseDocument -> ExerciseDocument.serializer().descriptor
+                is WorkoutTemplateDocument -> WorkoutTemplateDocument.serializer().descriptor
+                is WorkoutSessionDocument -> WorkoutSessionDocument.serializer().descriptor
+                else -> TrainingPlanDocument.serializer().descriptor
+            }
+            properties(schema, descriptor, true)
+            val validator = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(text)
+            val encoded = full.encodeToString(FtmDocument.serializer(), doc)
+            assertTrue(validator.validate(mapper.readTree(encoded)).isEmpty(), encoded)
+        }
+        val defs = Json.parseToJsonElement(resource("exercise.schema.json")).jsonObject["\$defs"]!!.jsonObject
+        listOf("field" to CustomTrainingField.serializer().descriptor, "exerciseRef" to ExerciseRef.serializer().descriptor,
+            "templateRef" to TemplateRef.serializer().descriptor, "load" to LoadTarget.serializer().descriptor,
+            "target" to SetTarget.serializer().descriptor, "snapshot" to ExerciseSnapshot.serializer().descriptor,
+            "weekTarget" to WeekTarget.serializer().descriptor, "block" to WorkoutBlock.serializer().descriptor,
+            "performed" to PerformedSet.serializer().descriptor, "sessionExercise" to SessionExercise.serializer().descriptor,
+            "day" to PlanDay.serializer().descriptor, "override" to WeekOverride.serializer().descriptor,
+            "rule" to ProgressionRule.serializer().descriptor, "exerciseRule" to ExerciseProgression.serializer().descriptor).forEach { (key, descriptor) -> properties(defs[key]!!.jsonObject, descriptor) }
+        val bundle = FtmReader.read(resource("example_training_program.ftm.json"))
+        assertTrue(bundle.errors.isEmpty(), bundle.issues.toString())
+        assertTrue(io.github.vargfor.ftmnotes.core.training.TrainingBundles.resolve(bundle.documents, emptyList()).questions.isEmpty())
     }
 
     @Test fun schemasRejectInvalidFoodValues() {

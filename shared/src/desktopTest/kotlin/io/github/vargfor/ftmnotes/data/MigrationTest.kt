@@ -14,11 +14,13 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class MigrationTest {
-    @Test fun populatedVersionTwoMigratesWithoutLosingContentOrTags() = runTest {
+    @Test fun populatedVersionTwoMigratesWithoutLosingContentOrTags() = runTest { migrate(2) }
+    @Test fun populatedVersionThreeMigratesWithoutLosingContentTagsOrRevisions() = runTest { migrate(3) }
+    private suspend fun migrate(version: Int) {
         val root = generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }.first { File(it, "settings.gradle.kts").exists() }
         val directory = Files.createTempDirectory("ftm-migration").toFile()
         val file = File(directory, "upgrade.db")
-        val schema = Json.parseToJsonElement(File(root, "shared/schemas/io.github.vargfor.ftmnotes.data.db.AppDatabase/2.json").readText()).jsonObject["database"]!!.jsonObject
+        val schema = Json.parseToJsonElement(File(root, "shared/schemas/io.github.vargfor.ftmnotes.data.db.AppDatabase/" + version + ".json").readText()).jsonObject["database"]!!.jsonObject
         BundledSQLiteDriver().open(file.absolutePath).use { connection ->
             schema["entities"]!!.jsonArray.forEach { raw ->
                 val entity = raw.jsonObject
@@ -27,10 +29,11 @@ class MigrationTest {
                 entity["indices"]?.jsonArray.orEmpty().forEach { index -> connection.execSQL(index.jsonObject["createSql"]!!.jsonPrimitive.content.replace('$'.toString() + "{TABLE_NAME}", table)) }
             }
             schema["setupQueries"]!!.jsonArray.forEach { connection.execSQL(it.jsonPrimitive.content) }
-            connection.execSQL("PRAGMA user_version = 2")
+            connection.execSQL("PRAGMA user_version = $version")
             val payload = FtmFormat.encodeDocument(NoteDocument(id = "old", title = "Migrated", content = "Kept")).replace("'", "''")
             connection.execSQL("""INSERT INTO documents VALUES('old','note','Migrated','Kept','$payload',1,NULL,0,0,1,1,NULL,0,'000000000000001-00000-old',NULL,1,'hash',NULL,NULL,'Kept',0,0,NULL)""")
             connection.execSQL("INSERT INTO doc_tags VALUES('old','Legacy','legacy')")
+            if (version == 3) connection.execSQL("INSERT INTO doc_revisions VALUES('revision','old','$payload','000000000000001-00000-old',1,NULL,0)")
         }
         val db = Room.databaseBuilder<AppDatabase>(file.absolutePath).buildFtmDatabase()
         try {
@@ -38,7 +41,9 @@ class MigrationTest {
             assertEquals("Migrated", row.title)
             assertEquals(payloadContent(row.payloadJson), "Kept")
             assertEquals("Legacy", db.documentDao().observeTagCounts().first().single().tag)
-            assertTrue(db.revisionDao().all().isEmpty())
+            assertEquals(if (version == 3) 1 else 0, db.revisionDao().all().size)
+            assertNull(db.trainingDao().active())
+            assertTrue(db.trainingDao().sessions().first().isEmpty())
         } finally { db.close(); directory.deleteRecursively() }
     }
     private fun payloadContent(raw: String) = (FtmFormat.decodeDocument(raw) as NoteDocument).content

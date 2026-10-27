@@ -24,22 +24,25 @@ internal class ScreenTestEnvironment {
     val db = Room.inMemoryDatabaseBuilder<AppDatabase>().buildFtmDatabase()
     val transactor = Transactor(db)
     val clock = DeviceClock(db.documentDao())
-    val repository = DocumentRepository(db.documentDao(), transactor, clock)
+    val repository = DocumentRepository(db.documentDao(), transactor, clock, training = db.trainingDao())
     val scope = AppScope()
     val bridge = RecordingBridge()
     val platform = AppPlatform(bridge)
     val settings = SettingsRepository(repository, db.devicePrefDao(), clock, scope)
+    val training = TrainingService(repository, db.trainingDao(), db.documentDao(), db.devicePrefDao(), transactor, settings, platform, scope)
     val attachments = AttachmentStore(bridge, db.attachmentDao())
     val imports = ImportCoordinator(bridge, attachments, repository, db.documentDao(), db.importBatchDao(), transactor)
     val recipeImports = RecipeImportService(null, imports, attachments)
     val models = ViewModelStore()
     private var koinStarted = false
 
-    suspend fun ready() = withTimeout(10_000) { settings.awaitLoaded() }
+    suspend fun ready() = withTimeout(10_000) { settings.awaitLoaded(); training.awaitReady() }
 
     fun startInjection() {
         startKoin { modules(module {
             single { repository }
+            single { training }
+            single { db.trainingDao() }
             single { transactor }
             single { scope }
             single { platform }

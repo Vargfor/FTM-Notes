@@ -16,6 +16,7 @@ import io.github.vargfor.ftmnotes.data.*
 import io.github.vargfor.ftmnotes.data.db.DocumentListRow
 import io.github.vargfor.ftmnotes.designsystem.components.*
 import io.github.vargfor.ftmnotes.feature.notes.DocumentCard
+import io.github.vargfor.ftmnotes.feature.training.contentTypeLabel
 import io.github.vargfor.ftmnotes.resources.*
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -51,8 +52,8 @@ fun SearchScreen(onBack: () -> Unit, onOpen: (String, DocumentType) -> Unit = { 
                 trailingIcon = { if (query.isNotEmpty()) ActionIcon(Res.drawable.ic_close, Res.string.action_clear) { query = "" } })
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(typeName == null, { typeName = null }, label = { Text(stringResource(Res.string.search_all)) })
-                listOf(DocumentType.Note to Res.string.type_note, DocumentType.Recipe to Res.string.type_recipe, DocumentType.ShoppingList to Res.string.type_shopping_list).forEach { (type, label) ->
-                    FilterChip(typeName == type.wire, { typeName = if (typeName == type.wire) null else type.wire }, label = { Text(stringResource(label)) })
+                DocumentType.entries.filter { it != DocumentType.Settings }.forEach { type ->
+                    FilterChip(typeName == type.wire, { typeName = if (typeName == type.wire) null else type.wire }, label = { Text(contentTypeLabel(type)) })
                 }
                 FilterChip(archive, { archive = !archive }, label = { Text(stringResource(Res.string.search_archived)) })
                 FilterChip(color != null, { if (color != null) color = null else colorDialog = true }, label = { Text(stringResource(Res.string.action_color)) })

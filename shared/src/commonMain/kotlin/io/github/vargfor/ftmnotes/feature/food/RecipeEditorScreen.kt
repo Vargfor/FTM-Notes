@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import io.github.vargfor.ftmnotes.core.model.*
@@ -98,7 +99,7 @@ fun RecipeEditorScreen(id: String, onBack: () -> Unit, viewModel: RecipeEditorVi
             item { OutlinedButton({ viewModel.edit(draft.copy(ingredientGroups = draft.ingredientGroups + IngredientGroup(id = Ids.newId()))) }) { Text(stringResource(Res.string.food_add_group)) } }
             item { Text(stringResource(Res.string.food_steps), style = MaterialTheme.typography.titleLarge) }
             itemsIndexed(draft.steps, key = { _, it -> it.id!! }) { index, step ->
-                ElevatedCard {
+                ElevatedCard(Modifier.cardOutline()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(step.text, { text -> viewModel.edit(draft.copy(steps = draft.steps.map { if (it.id == step.id) it.copy(text = text) else it }), "step/${step.id}") },
                             Modifier.fillMaxWidth(), minLines = 2, label = { Text(stringResource(Res.string.food_step)) })
@@ -141,7 +142,7 @@ private fun IngredientEditor(
     onMove: (Int) -> Unit, index: Int, size: Int,
 ) {
     var expanded by remember(ingredient.id) { mutableStateOf(false) }
-    ElevatedCard {
+    ElevatedCard(Modifier.cardOutline()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(ingredient.raw.ifBlank { FoodEngine.display(ingredient, policy = FoodPolicy(UnitMode.Original)).text() },
                 { text -> onChange(IngredientParser.parse(text).copy(id = ingredient.id), "ingredient/${ingredient.id}") },
@@ -169,8 +170,10 @@ private fun IngredientEditor(
 }
 
 @Composable
-internal fun NumberEntry(label: StringResource, value: Double?, modifier: Modifier = Modifier, allowBlank: Boolean = true, allowZero: Boolean = false, integer: Boolean = false, onChange: (Double?) -> Unit) {
-    var text by remember(value) { mutableStateOf(value?.let { QuantityFormatter.decimal(it) }.orEmpty()) }
+internal fun NumberEntry(label: StringResource, value: Double?, modifier: Modifier = Modifier, allowBlank: Boolean = true, allowZero: Boolean = false, integer: Boolean = false, help: StringResource? = null, onChange: (Double?) -> Unit) {
+    var text by remember { mutableStateOf(value?.let { QuantityFormatter.decimal(it) }.orEmpty()) }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(value, focused) { if (!focused) text = value?.let { QuantityFormatter.decimal(it) }.orEmpty() }
     val parsed = text.replace(',', '.').toDoubleOrNull()
     val valid = if (text.isBlank()) allowBlank else parsed != null && parsed.isFinite() && (if (allowZero) parsed >= 0 else parsed > 0) && (!integer || parsed % 1 == 0.0)
     OutlinedTextField(text, { next ->
@@ -178,7 +181,8 @@ internal fun NumberEntry(label: StringResource, value: Double?, modifier: Modifi
         val number = next.replace(',', '.').toDoubleOrNull()
         if (next.isBlank() && allowBlank) onChange(null)
         else if (number != null && number.isFinite() && (if (allowZero) number >= 0 else number > 0) && (!integer || number % 1 == 0.0)) onChange(number)
-    }, modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(label)) }, isError = !valid,
+    }, modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }, singleLine = true, label = { Text(stringResource(label)) }, isError = !valid,
+        trailingIcon = help?.let { body -> { HelpIcon(stringResource(label), body) } },
         supportingText = if (!valid) { { Text(stringResource(Res.string.food_positive_number)) } } else null)
 }
 
@@ -198,6 +202,6 @@ internal fun MoveControls(index: Int, size: Int, onMove: (Int) -> Unit) {
 }
 internal fun <T> moveItem(items: List<T>, index: Int, delta: Int): List<T> {
     val target = index + delta
-    if (target !in items.indices) return items
+    if (index !in items.indices || target !in items.indices) return items
     return items.toMutableList().apply { add(target, removeAt(index)) }
 }

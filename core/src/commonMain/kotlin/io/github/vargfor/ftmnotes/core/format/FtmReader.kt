@@ -105,14 +105,17 @@ object FtmReader {
         }
 
         val known = (0 until serializer.descriptor.elementsCount).map(serializer.descriptor::getElementName).toSet()
-        val aliases = if (type == DocumentType.Recipe) setOf("ingredients", "instructions") else emptySet()
+        val aliases = when(type) { DocumentType.Recipe -> setOf("ingredients", "instructions"); DocumentType.WorkoutTemplate -> setOf("exercises"); else -> emptySet() }
         element.keys.filter { it != FtmFormat.DISCRIMINATOR && it !in known && it !in aliases }.forEach { key ->
             issues += ReadIssue(ReadIssue.Severity.Warning, "$path.$key", "Ignored unknown field \"$key\"")
         }
 
         val normalised = normalise(element, type, path, issues)
         return try {
-            FtmFormat.lenient.decodeFromJsonElement(serializer, normalised)
+            val document = FtmFormat.lenient.decodeFromJsonElement(serializer, normalised)
+            val trainingIssues = io.github.vargfor.ftmnotes.core.training.TrainingValidation.issues(document, path)
+            issues += trainingIssues
+            if (trainingIssues.any { it.severity == ReadIssue.Severity.Error }) null else document
         } catch (e: SerializationException) {
             issues += error(path, e.message?.lineSequence()?.firstOrNull() ?: "Could not read this document")
             null
@@ -125,6 +128,7 @@ object FtmReader {
     /** Fixes common deviations before decoding: missing checklist `kind`, non-canonical colours. */
     private fun normalise(element: JsonObject, type: DocumentType, path: String, issues: MutableList<ReadIssue>): JsonObject {
         val fields = element.filterKeys { it != FtmFormat.DISCRIMINATOR }.toMutableMap()
+        io.github.vargfor.ftmnotes.core.training.TrainingValidation.normalise(fields, type, path, issues)
         if (type == DocumentType.Recipe) {
             if ("ingredients" in fields && "ingredientGroups" !in fields) {
                 fields["ingredientGroups"] = JsonArray(listOf(buildJsonObject { put("items", fields.getValue("ingredients")) }))

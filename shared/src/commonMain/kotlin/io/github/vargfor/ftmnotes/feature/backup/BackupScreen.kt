@@ -63,7 +63,7 @@ fun BackupScreen(onBack: () -> Unit) {
             if (bridge.canAutomateBackups) item {
                 ListItem(headlineContent = { Text(stringResource(Res.string.backup_enabled)) },
                     trailingContent = { Switch(snapshot[Flags.backupEnabled], { enabled -> work { backups.enable(enabled) } }, enabled = !busy && folder.isNotBlank()) })
-                Text(stringResource(Res.string.backup_retention), style = MaterialTheme.typography.labelLarge)
+                HelpLabel(stringResource(Res.string.backup_retention), Res.string.help_backup_retention, style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Flags.backupRetention.options.forEach { count -> FilterChip(snapshot[Flags.backupRetention] == count,
                         { work { settings.set(Flags.backupRetention, count) } }, label = { Text(count.toString()) }) }
@@ -94,7 +94,7 @@ fun BackupScreen(onBack: () -> Unit) {
             }
             item {
                 HorizontalDivider()
-                Text(stringResource(Res.string.action_export), style = MaterialTheme.typography.titleLarge)
+                HelpLabel(stringResource(Res.string.action_export), Res.string.help_content_export, style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(Res.string.backup_json_note), style = MaterialTheme.typography.bodySmall)
                 OutlinedButton({ work { val file = backups.exportFtm(); bridge.exportFile(file, file.name, "application/json") } }, enabled = !busy) {
                     Text(stringResource(Res.string.action_export))

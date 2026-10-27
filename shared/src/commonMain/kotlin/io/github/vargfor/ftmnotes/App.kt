@@ -2,6 +2,8 @@ package io.github.vargfor.ftmnotes
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import io.github.vargfor.ftmnotes.designsystem.components.LocalHelpIcons
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +32,8 @@ fun App(onThemeChange: (mode: ThemeMode, darkTheme: Boolean) -> Unit = { _, _ ->
     LaunchedEffect(themeMode, darkTheme) { onThemeChange(themeMode, darkTheme) }
 
     FtmTheme(darkTheme = darkTheme, pureBlack = settings[Flags.pureBlack]) {
-        AppShell(tabLayout = settings.tabLayout())
+        CompositionLocalProvider(LocalHelpIcons provides settings[Flags.helpIcons]) {
+            AppShell(tabLayout = settings.tabLayout())
+        }
     }
 }

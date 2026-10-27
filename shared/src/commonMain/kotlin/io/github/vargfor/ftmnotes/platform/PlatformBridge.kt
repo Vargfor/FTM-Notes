@@ -8,7 +8,7 @@ import okio.Path
 
 data class PickedFile(val name: String, val path: Path, val mime: String)
 data class BackupFile(val name: String, val reference: String, val modifiedAt: Long)
-data class SharedInput(val text: String? = null, val files: List<PickedFile> = emptyList(), val checklist: Boolean = false)
+data class SharedInput(val text: String? = null, val files: List<PickedFile> = emptyList(), val checklist: Boolean = false, val workoutId: String? = null)
 class AppPlatform(val bridge: PlatformBridge)
 
 /** Capability interface: iOS stays compilable without adding paused platform implementations. */
@@ -34,6 +34,13 @@ interface PlatformBridge {
     suspend fun scheduleTimer(id: String, title: String, endMillis: Long): Unit = unsupported()
     fun cancelTimer(id: String) {}
     fun backupsChanged(enabled: Boolean) {}
+    fun workoutChanged(sessionId: String?) {}
+    fun elapsedRealtimeMillis(): Long? = null
+    fun bootId(): Long? = null
+    suspend fun requestWorkoutNotifications(force: Boolean = false) {}
+    fun canUseExactTimers(): Boolean = false
+    fun requestExactTimers() {}
+    fun haptic() {}
 }
 
 private val EmptyIncoming = MutableSharedFlow<SharedInput>()

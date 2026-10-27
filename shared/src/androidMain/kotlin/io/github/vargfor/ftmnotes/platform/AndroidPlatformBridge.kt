@@ -57,6 +57,41 @@ class AndroidPlatformBridge(private val context: Context) : PlatformBridge {
         folder = host.registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uriResult?.complete(it) }
         camera = host.registerForActivityResult(ActivityResultContracts.TakePicture()) { photoResult?.complete(it) }
         notificationPermission = host.registerForActivityResult(ActivityResultContracts.RequestPermission()) { permissionResult?.complete(it) }
+        CoroutineScope(SupervisorJob() + Dispatchers.Main).launch {
+            val training = KoinPlatform.getKoin().get<io.github.vargfor.ftmnotes.data.TrainingService>()
+            training.awaitReady()
+            workoutChanged(KoinPlatform.getKoin().get<io.github.vargfor.ftmnotes.data.db.TrainingDao>().active()?.sessionId)
+        }
+    }
+
+    override fun workoutChanged(sessionId: String?) {
+        val intent = Intent(context, WorkoutForegroundService::class.java)
+        if (sessionId == null) {
+            cancelRestAlarm(context)
+            context.getSystemService(NotificationManager::class.java).cancel(2402)
+            context.stopService(intent)
+        }
+        else try { context.startForegroundService(intent) }
+        catch (e: RuntimeException) { android.util.Log.w("FTM-Training", "Workout remains saved; foreground service could not start", e) }
+    }
+    override fun elapsedRealtimeMillis(): Long = android.os.SystemClock.elapsedRealtime()
+    override fun bootId(): Long? = androidBootId(context)
+    override fun canUseExactTimers() = exactTimersAllowed(context)
+    override fun requestExactTimers() {
+        if (Build.VERSION.SDK_INT >= 31) activity?.startActivity(Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+            Uri.parse("package:" + context.packageName)))
+    }
+    override fun haptic() { activity?.window?.decorView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM) }
+    override suspend fun requestWorkoutNotifications(force: Boolean) {
+        if (Build.VERSION.SDK_INT < 33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED || notificationPermission == null) return
+        val permissions = context.getSharedPreferences("runtime-permissions", Context.MODE_PRIVATE)
+        if (!force && permissions.getBoolean("training-notifications", false)) return
+        pickerMutex.withLock {
+            permissions.edit().putBoolean("training-notifications", true).apply()
+            val pending = CompletableDeferred<Boolean>(); permissionResult = pending
+            try { withContext(Dispatchers.Main) { notificationPermission?.launch(Manifest.permission.POST_NOTIFICATIONS) }; pending.await() }
+            finally { permissionResult = null }
+        }
     }
 
     fun unbind(host: ComponentActivity) {
@@ -196,6 +231,9 @@ class AndroidPlatformBridge(private val context: Context) : PlatformBridge {
     }
 
     fun receive(intent: Intent) {
+        if (intent.action == OPEN_WORKOUT) {
+            intent.getStringExtra("workout_id")?.let { inbox.trySend(SharedInput(workoutId = it)) }; return
+        }
         if (intent.action !in listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE, "io.github.vargfor.ftmnotes.NEW_NOTE", "io.github.vargfor.ftmnotes.NEW_CHECKLIST")) return
         val copied = Intent(intent)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

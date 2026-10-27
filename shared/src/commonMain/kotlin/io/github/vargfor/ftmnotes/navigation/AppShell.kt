@@ -33,7 +33,12 @@ import io.github.vargfor.ftmnotes.feature.notes.NoteSelectionPlaceholder
 import io.github.vargfor.ftmnotes.feature.notes.NotesListScreen
 import io.github.vargfor.ftmnotes.feature.search.SearchScreen
 import io.github.vargfor.ftmnotes.feature.settings.SettingsScreen
-import io.github.vargfor.ftmnotes.feature.training.TrainingHomeScreen
+import io.github.vargfor.ftmnotes.feature.training.*
+import io.github.vargfor.ftmnotes.data.TrainingService
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import io.github.vargfor.ftmnotes.feature.importer.ImportHomeScreen
 import io.github.vargfor.ftmnotes.feature.importer.ImportPreviewScreen
 import io.github.vargfor.ftmnotes.feature.backup.BackupScreen
@@ -60,8 +65,17 @@ fun AppShell(tabLayout: TabLayout = SettingsSnapshot.Defaults.tabLayout()) {
     val bridge = koinInject<AppPlatform>().bridge
     val repository: DocumentRepository = koinInject()
     val attachments: AttachmentStore = koinInject()
+    val training: TrainingService = koinInject()
+    val active by training.active.collectAsStateWithLifecycle()
     LaunchedEffect(bridge) {
         bridge.incoming.collect { input ->
+            if (input.workoutId != null) {
+                if (Tab.Training in navigator.enabledTabs && navigator.currentTab != Tab.Training) navigator.selectTab(Tab.Training)
+                val session = repository.get(input.workoutId)?.document as? io.github.vargfor.ftmnotes.core.model.WorkoutSessionDocument
+                if (session?.status == io.github.vargfor.ftmnotes.core.model.SessionStatus.Finished) navigator.showDetail(Route.TrainingDetail(input.workoutId))
+                else if (session != null) navigator.showDetail(Route.Workout(input.workoutId))
+                return@collect
+            }
             val id = if (input.text.isNullOrBlank() && input.files.isEmpty()) Ids.newId()
             else repository.save(NoteDocument(content = MarkdownLines.fromPlainText(input.text.orEmpty()),
                 attachments = input.files.map { file -> attachments.put(FileSystem.SYSTEM.source(file.path), file.mime, file.name) }))
@@ -120,11 +134,21 @@ fun AppShell(tabLayout: TabLayout = SettingsSnapshot.Defaults.tabLayout()) {
                 }
             },
         ) {
-            NavDisplay(
-                entries = navigator.visibleTabs.flatMap { entriesByTab.getValue(it) },
-                sceneStrategies = listOf(listDetail),
-                onBack = navigator::goBack,
-            )
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f)) {
+                    NavDisplay(
+                        entries = navigator.visibleTabs.flatMap { entriesByTab.getValue(it) },
+                        sceneStrategies = listOf(listDetail),
+                        onBack = navigator::goBack,
+                    )
+                }
+                if ((navigator.stack(navigator.currentTab).lastOrNull() as? Route.Workout)?.id != active?.state?.sessionId) {
+                    ActiveWorkoutBar(active) { id ->
+                        if (Tab.Training in navigator.enabledTabs && navigator.currentTab != Tab.Training) navigator.selectTab(Tab.Training)
+                        navigator.showDetail(Route.Workout(id))
+                    }
+                }
+            }
         }
     }
 }
@@ -136,9 +160,12 @@ private fun appEntryProvider(tab: Tab, navigator: AppNavigator): (NavKey) -> Nav
     val openSettings = { navigator.navigate(Route.Settings) }
 
     return entryProvider {
-        entry<Route.TrainingHome>(clazzContentKey = contentKey) {
+        entry<Route.TrainingHome>(clazzContentKey = contentKey, metadata = ListDetailSceneStrategy.listPane(sceneKey = tab, detailPlaceholder = { TrainingSelectionPlaceholder() })) {
             SectionTheme(tab.section) {
-                TrainingHomeScreen(onOpenSearch = openSearch, onOpenSettings = openSettings)
+                TrainingHomeScreen(onOpenSearch = openSearch, onOpenSettings = { navigator.navigate(Route.TrainingSettings) },
+                    onOpen = { navigator.showDetail(Route.TrainingDetail(it)) }, onWorkout = { navigator.navigate(Route.Workout(it)) },
+                    onNew = { navigator.showDetail(Route.TrainingEditor(Ids.newId(), it.wire)) }, onImport = { navigator.navigate(Route.TrainingImport) },
+                    onArchive = { navigator.navigate(Route.Archive(it)) }, onTrash = { navigator.navigate(Route.Trash(it)) })
             }
         }
         entry<Route.FoodHome>(clazzContentKey = contentKey,
@@ -179,11 +206,11 @@ private fun appEntryProvider(tab: Tab, navigator: AppNavigator): (NavKey) -> Nav
         entry<Route.Settings>(clazzContentKey = contentKey) {
             SettingsScreen(onBack = navigator::goBack,
                 onOpenImport = { navigator.navigate(Route.ImportHome) }, onOpenBackups = { navigator.navigate(Route.Backups) },
-                onOpenFoodSettings = { navigator.navigate(Route.FoodSettings) })
+                onOpenFoodSettings = { navigator.navigate(Route.FoodSettings) }, onOpenTrainingSettings = { navigator.navigate(Route.TrainingSettings) })
         }
         entry<Route.Archive>(clazzContentKey = contentKey) { route ->
             NotesListScreen(
-                onOpenNote = { id -> when (DocumentType.fromWire(route.type)) { DocumentType.Recipe -> navigator.showDetail(Route.Recipe(id)); DocumentType.ShoppingList -> navigator.showDetail(Route.ShoppingList(id)); else -> navigator.showDetail(Route.NoteEditor(id)) } }, onNewNote = {},
+                onOpenNote = { id -> when (DocumentType.fromWire(route.type)) { DocumentType.Recipe -> navigator.showDetail(Route.Recipe(id)); DocumentType.ShoppingList -> navigator.showDetail(Route.ShoppingList(id)); DocumentType.Exercise, DocumentType.WorkoutTemplate, DocumentType.WorkoutSession, DocumentType.TrainingPlan -> navigator.showDetail(Route.TrainingDetail(id)); else -> navigator.showDetail(Route.NoteEditor(id)) } }, onNewNote = {},
                 onOpenSearch = openSearch, onOpenSettings = openSettings,
                 mode = io.github.vargfor.ftmnotes.feature.notes.NoteCollection.Archive, onBack = navigator::goBack,
                 documentType = DocumentType.fromWire(route.type) ?: DocumentType.Note,
@@ -202,6 +229,7 @@ private fun appEntryProvider(tab: Tab, navigator: AppNavigator): (NavKey) -> Nav
                     DocumentType.Note -> navigator.showDetail(Route.NoteEditor(id))
                     DocumentType.Recipe -> navigator.showDetail(Route.Recipe(id))
                     DocumentType.ShoppingList -> navigator.showDetail(Route.ShoppingList(id))
+                    DocumentType.Exercise, DocumentType.WorkoutTemplate, DocumentType.WorkoutSession, DocumentType.TrainingPlan -> navigator.showDetail(Route.TrainingDetail(id))
                     else -> Unit
                 }
             })
@@ -228,6 +256,25 @@ private fun appEntryProvider(tab: Tab, navigator: AppNavigator): (NavKey) -> Nav
         entry<Route.ShoppingList>(clazzContentKey = contentKey, metadata = ListDetailSceneStrategy.detailPane(sceneKey = tab)) { route ->
             ShoppingScreen(route.id, navigator::goBack, onOpenRecipe = { navigator.showDetail(Route.Recipe(it)) })
         }
+        entry<Route.TrainingDetail>(clazzContentKey = contentKey, metadata = ListDetailSceneStrategy.detailPane(sceneKey = tab)) { route ->
+            TrainingDetailScreen(route.id, navigator::goBack,
+                { id, type -> navigator.showDetail(Route.TrainingEditor(id, type)) },
+                { navigator.navigate(Route.Workout(it)) }, { navigator.showDetail(Route.TrainingDetail(it)) },
+                { navigator.navigate(Route.TrainingSettings) })
+        }
+        entry<Route.TrainingEditor>(clazzContentKey = contentKey, metadata = ListDetailSceneStrategy.detailPane(sceneKey = tab)) { route ->
+            TrainingEditorScreen(route.id, route.type, navigator::goBack)
+        }
+        entry<Route.Workout>(clazzContentKey = contentKey) { route ->
+            WorkoutScreen(route.id, navigator::goBack, onFinished = { id ->
+                navigator.goBack(); navigator.showDetail(Route.TrainingDetail(id))
+            })
+        }
+        entry<Route.TrainingImport>(clazzContentKey = contentKey) {
+            ImportHomeScreen(navigator::goBack, { navigator.navigate(Route.ImportPreview(it)) },
+                { navigator.navigate(Route.FoodImport) }, initialType = DocumentType.TrainingPlan)
+        }
+        entry<Route.TrainingSettings>(clazzContentKey = contentKey) { TrainingSettingsScreen(navigator::goBack) }
         entry<Route.FoodSettings>(clazzContentKey = contentKey) { FoodSettingsScreen(navigator::goBack) }
         entry<Route.FoodImport>(clazzContentKey = contentKey) { FoodImportScreen(navigator::goBack, { navigator.navigate(Route.ImportPreview(it)) }) }
     }

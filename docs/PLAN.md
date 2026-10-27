@@ -131,6 +131,10 @@ iosApp        SwiftUI shell; later GoogleSignIn bridge + share extension
   - **Paprika**: a zip of gzipped JSON.
 
 ## Training
+
+Implemented for Android in Phase 3. See [Training and portable programs](TRAINING.md) for the
+shipped import/export contract, complete program example, defaults and recovery behavior. iOS
+runtime work remains paused.
 **Models:**
 - **`exercise`:**
   - Name, aliases, muscle groups, equipment.
@@ -139,7 +143,7 @@ iosApp        SwiftUI shell; later GoogleSignIn bridge + share extension
 - **`workout_template`:** blocks of `{exercise, supersetGroup?, rest?, notes?, sets[SetTarget]}`.
   - `SetTarget`: kind (warmup/working/drop/failure/AMRAP), reps (n or range), load (absolute / %1RM / %TM / RPE / RIR), duration/distance.
 - **`workout_session`:**
-  - `status` (in_progress/finished), start/end, plan ref (plan, week, day), bodyweight, notes, rating.
+  - `status` (draft/in_progress/finished), start/end, plan ref (plan, week, day), bodyweight, notes, rating.
   - Exercises with `PerformedSet`: the actual values, completed, custom values and a snapshot of the target.
 - **`training_plan`:**
   - N weeks, a rotation schedule (calendar scheduling comes later), day → template, per-week overrides.
@@ -177,8 +181,8 @@ iosApp        SwiftUI shell; later GoogleSignIn bridge + share extension
   - Only one `in_progress` session exists. It is restored from the DB and isn't synced until finished.
 - **Rest timer:** stores an absolute end time.
   - **Android:**
-    - a foreground service (type `health`) while a session is active, with a countdown chronometer notification
-    - the end alert uses `setExactAndAllowWhileIdle` if exact alarms were granted, otherwise a partial wakelock
+    - a foreground service (type `specialUse`, with a declared logging/rest-timer subtype) while a session is active, with a workout chronometer and rest countdown notification
+    - the end alert uses `setExactAndAllowWhileIdle` if exact alarms were granted, otherwise a bounded rest-only partial wake lock plus an inexact alarm
     - `POST_NOTIFICATIONS` is requested at the first session
   - **iOS:** a scheduled `UNTimeIntervalNotificationTrigger` (Time-Sensitive).
 - **Finish:** a summary (duration, volume, PRs) and "update template with today's changes".
@@ -295,7 +299,7 @@ Each phase ends green on its exit criteria before the next starts. Food and Trai
 40 desktop screen captures, Android assembly and iOS common-code compilation are verified.
 Phone/tablet emulator checks cover notes, recipes, photos, sharing, local backups and background
 cooking alerts. Phase 1's real Keep Takeout import and Drive/OneDrive checks on Henrik's phone
-remain pending, so the combined completion gate for starting Training is still open.
+remain pending. Henrik explicitly requested Phase 3 next; those personal-device checks remain tracked separately.
 See [`ROADMAP.md`](ROADMAP.md) for the current acceptance record.
 
 | Phase | Scope | Exit criteria |

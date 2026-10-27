@@ -1,0 +1,121 @@
+{
+  "ftm": 1,
+  "documents": [
+    {
+      "type": "exercise",
+      "title": "Bench Press",
+      "tracking": "weight_reps",
+      "equipment": "barbell",
+      "muscleGroups": [
+        "chest"
+      ]
+    },
+    {
+      "type": "exercise",
+      "title": "Back Squat",
+      "tracking": "weight_reps",
+      "equipment": "barbell",
+      "muscleGroups": [
+        "quadriceps"
+      ]
+    },
+    {
+      "type": "workout_template",
+      "title": "Upper A",
+      "blocks": [
+        {
+          "exercise": {
+            "name": "Bench Press"
+          },
+          "restSeconds": 120,
+          "sets": [
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            },
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            },
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "workout_template",
+      "title": "Lower A",
+      "blocks": [
+        {
+          "exercise": {
+            "name": "Back Squat"
+          },
+          "restSeconds": 120,
+          "sets": [
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            },
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            },
+            {
+              "reps": 8,
+              "load": {
+                "amount": 40,
+                "unit": "kg"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "training_plan",
+      "title": "Six-week foundation",
+      "weeks": 6,
+      "days": [
+        {
+          "name": "Upper day",
+          "template": {
+            "name": "Upper A"
+          }
+        },
+        {
+          "name": "Lower day",
+          "template": {
+            "name": "Lower A"
+          }
+        }
+      ],
+      "progression": {
+        "kind": "double",
+        "repMin": 8,
+        "repMax": 12,
+        "increment": 2.5,
+        "unit": "kg"
+      },
+      "deloadEveryWeeks": 4,
+      "deloadPercent": 10
+    }
+  ]
+}

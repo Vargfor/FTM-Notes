@@ -178,7 +178,7 @@ fun NotesListScreen(
 fun DocumentCard(row: DocumentListRow, selected: Boolean = false, onClick: () -> Unit, onLongClick: () -> Unit = {}) {
     Card(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(containerColor = noteBackground(row.color)),
-        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null) {
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else cardBorder()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             row.thumbSha?.let { AttachmentThumbnail(it) }
             if (row.pinned) Icon(painterResource(Res.drawable.ic_push_pin_filled), stringResource(Res.string.action_pin), Modifier.size(18.dp))

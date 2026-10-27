@@ -116,7 +116,7 @@ fun ShoppingScreen(id: String, onBack: () -> Unit, onOpenRecipe: (String) -> Uni
 
 @Composable
 private fun ShoppingRow(item: ShoppingItem, policy: FoodPolicy, toggle: () -> Unit, edit: () -> Unit, remove: () -> Unit, openRecipe: (String) -> Unit) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    ElevatedCard(Modifier.fillMaxWidth().cardOutline()) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Checkbox(item.checked, { toggle() })
             Column(Modifier.weight(1f).clickable(onClick = edit).padding(vertical = 8.dp)) {

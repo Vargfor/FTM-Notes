@@ -1,5 +1,6 @@
 package io.github.vargfor.ftmnotes.di
 
+import io.github.vargfor.ftmnotes.data.TrainingService
 import io.github.vargfor.ftmnotes.data.DeviceClock
 import io.github.vargfor.ftmnotes.data.AttachmentStore
 import io.github.vargfor.ftmnotes.data.ImportCoordinator
@@ -12,6 +13,8 @@ import io.github.vargfor.ftmnotes.platform.AppPlatform
 import io.github.vargfor.ftmnotes.data.DocumentRepository
 import io.github.vargfor.ftmnotes.data.Transactor
 import io.github.vargfor.ftmnotes.data.db.AppDatabase
+import io.github.vargfor.ftmnotes.feature.training.TrainingEditorViewModel
+import io.github.vargfor.ftmnotes.feature.training.WorkoutViewModel
 import io.github.vargfor.ftmnotes.feature.notes.NoteEditorViewModel
 import io.github.vargfor.ftmnotes.feature.notes.NotesViewModel
 import io.github.vargfor.ftmnotes.feature.settings.SettingsViewModel
@@ -47,18 +50,22 @@ val dataModule = module {
     single { get<AppDatabase>().attachmentDao() }
     single { get<AppDatabase>().devicePrefDao() }
     single { get<AppDatabase>().revisionDao() }
+    single { get<AppDatabase>().trainingDao() }
     single { AttachmentStore(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get()) }
     single { ImportCoordinator(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get(), get(), get(), get(), get()) }
-    single { BackupService(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get(), get(), get(), get(), get(), get(), get(), get()) }
+    single { BackupService(getOrNull<PlatformBridge>() ?: UnsupportedPlatformBridge, get(), get(), get(), get(), get(), get(), get(), get(), training = get()) }
     single { RecipeImportService(getOrNull<HttpClient>(), get(), get()) }
+    single(createdAtStart = true) { TrainingService(get(), get(), get(), get(), get(), get(), get(), get()) }
     single { Transactor(get()) }
     single { DeviceClock(get()) }
-    single { DocumentRepository(get(), get(), get()) }
+    single { DocumentRepository(get(), get(), get(), training = get()) }
     // Eager: starts reading settings while the platform is still starting up.
     single(createdAtStart = true) { SettingsRepository(get(), get(), get(), get()) }
 }
 
 val viewModelModule = module {
+    viewModel { (id: String, type: String) -> TrainingEditorViewModel(id, type, get(), get()) }
+    viewModel { (id: String) -> WorkoutViewModel(id, get(), get(), get()) }
     viewModelOf(::NotesViewModel)
     viewModelOf(::SettingsViewModel)
     viewModel { (noteId: String) -> NoteEditorViewModel(noteId, get(), get()) }

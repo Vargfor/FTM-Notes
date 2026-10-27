@@ -118,6 +118,10 @@ data class SettingValue(val v: JsonElement, val hlc: String)
 
 /** Returns a copy with the storage-managed fields replaced. */
 fun FtmDocument.withMeta(id: String, createdAt: Instant?, updatedAt: Instant?): FtmDocument = when (this) {
+    is TrainingPlanDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
+    is WorkoutSessionDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
+    is WorkoutTemplateDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
+    is ExerciseDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
     is RecipeDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
     is ShoppingListDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
     is NoteDocument -> copy(id = id, createdAt = createdAt, updatedAt = updatedAt)
@@ -131,6 +135,10 @@ fun FtmDocument.withOrganisation(
     color: String? = this.color,
     tags: List<String> = this.tags,
 ): FtmDocument = when (this) {
+    is TrainingPlanDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
+    is WorkoutSessionDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
+    is WorkoutTemplateDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
+    is ExerciseDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
     is RecipeDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
     is ShoppingListDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)
     is NoteDocument -> copy(pinned = pinned, archived = archived, color = color, tags = tags)

@@ -29,6 +29,11 @@ sealed interface Route : NavKey {
     @Serializable data class RecipeEditor(val id: String) : Route
     @Serializable data class CookMode(val id: String) : Route
     @Serializable data class ShoppingList(val id: String) : Route
+    @Serializable data class TrainingDetail(val id: String) : Route
+    @Serializable data class TrainingEditor(val id: String, val type: String) : Route
+    @Serializable data class Workout(val id: String) : Route
+    @Serializable data object TrainingImport : Route
+    @Serializable data object TrainingSettings : Route
     @Serializable data object FoodImport : Route
     @Serializable data object FoodSettings : Route
 }

@@ -8,6 +8,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.vargfor.ftmnotes.data.*
+import io.github.vargfor.ftmnotes.core.model.DocumentType
+import io.github.vargfor.ftmnotes.feature.importer.PromptActions
 import io.github.vargfor.ftmnotes.platform.AppPlatform
 import io.github.vargfor.ftmnotes.designsystem.components.*
 import io.github.vargfor.ftmnotes.resources.*
@@ -49,15 +51,10 @@ fun FoodImportScreen(onBack: () -> Unit, onPreview: (String) -> Unit) {
             } }, Modifier.fillMaxWidth(), enabled = !busy) { Text(stringResource(Res.string.food_import_paprika)) } }
             item {
                 HorizontalDivider()
-                Text(stringResource(Res.string.food_recipe_prompt), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(Res.string.import_prompt))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ run { bridge.copyText(Res.readBytes("files/AI_PROMPT_recipe.md").decodeToString()); snackbar.showSnackbar(getString(Res.string.import_prompt_copied)) } }, enabled = !busy) { Text(stringResource(Res.string.import_copy_prompt)) }
-                    OutlinedButton({ run { bridge.shareText(Res.readBytes("files/AI_PROMPT_recipe.md").decodeToString()) } }, enabled = !busy) { Text(stringResource(Res.string.import_share_prompt)) }
-                }
                 OutlinedTextField(pasted, { pasted = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp), label = { Text(stringResource(Res.string.food_import_paste)) })
                 Button({ run { onPreview(imports.prepareFtm(pasted).id) } }, enabled = !busy && pasted.isNotBlank()) { Text(stringResource(Res.string.import_preview)) }
             }
+            item { PromptActions(DocumentType.Recipe) { problem = it } }
             if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             problem?.let { item { Text(stringResource(Res.string.status_error, it), color = MaterialTheme.colorScheme.error) } }
         }

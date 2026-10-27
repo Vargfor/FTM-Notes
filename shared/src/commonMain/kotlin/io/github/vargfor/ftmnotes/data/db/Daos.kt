@@ -39,6 +39,12 @@ private const val LIST_COLUMNS = """
 @Dao
 interface DocumentDao {
 
+    @Query("SELECT * FROM documents WHERE type = :type AND deleted_at IS NULL AND purged = 0")
+    fun observeType(type: String): Flow<List<DocumentEntity>>
+
+    @Query("SELECT * FROM documents WHERE type = :type AND deleted_at IS NULL AND purged = 0")
+    suspend fun liveType(type: String): List<DocumentEntity>
+
     @Upsert
     suspend fun upsert(document: DocumentEntity)
 

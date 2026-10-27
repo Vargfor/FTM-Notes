@@ -1,5 +1,6 @@
 package io.github.vargfor.ftmnotes.core.format
 
+import io.github.vargfor.ftmnotes.core.model.*
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
 import io.github.vargfor.ftmnotes.core.model.NoteKind
@@ -9,6 +10,10 @@ import io.github.vargfor.ftmnotes.core.model.ShoppingListDocument
 
 /** Searchable, preview-friendly text for a document (Markdown syntax stripped). */
 fun FtmDocument.plainText(): String = when (this) {
+    is ExerciseDocument -> (aliases + muscleGroups + listOf(category, equipment, notes)).joinToString("\n")
+    is WorkoutTemplateDocument -> (listOf(notes) + blocks.map { it.exercise.name + " " + it.notes }).joinToString("\n")
+    is WorkoutSessionDocument -> (listOf(notes, templateName) + exercises.map { it.snapshot.name.ifBlank { it.exercise.name } + " " + it.notes }).joinToString("\n")
+    is TrainingPlanDocument -> (listOf(notes) + days.map { it.name + " " + it.template.name }).joinToString("\n")
     is RecipeDocument -> (listOf(description, notes, sourceUrl.orEmpty(), sourceName.orEmpty()) +
         ingredientGroups.flatMap { group -> listOf(group.name.orEmpty()) + group.items.map { it.raw + " " + it.name + " " + it.note } } + steps.map { it.text }).joinToString("\n")
     is ShoppingListDocument -> items.filterNot { it.deleted }.joinToString("\n") { it.text }
@@ -37,6 +42,10 @@ private const val PREVIEW_CHARS = 400
 private const val PREVIEW_ITEMS = 8
 
 fun FtmDocument.listProjection(): ListProjection = when (this) {
+    is ExerciseDocument -> ListProjection((muscleGroups + equipment).joinToString(" · "), 0, 0, null)
+    is WorkoutTemplateDocument -> ListProjection(blocks.joinToString("\n") { it.exercise.name }, blocks.sumOf { it.sets.size }, 0, null)
+    is WorkoutSessionDocument -> ListProjection(exercises.joinToString("\n") { it.snapshot.name.ifBlank { it.exercise.name } }, exercises.sumOf { it.sets.size }, exercises.sumOf { e -> e.sets.count { it.completed } }, null)
+    is TrainingPlanDocument -> ListProjection(days.joinToString("\n") { it.name + " · " + it.template.name }, days.size, 0, null)
     is RecipeDocument -> ListProjection((description.ifBlank { ingredientGroups.flatMap { it.items }.joinToString(", ") { it.name.ifBlank { it.raw } } }).take(PREVIEW_CHARS), 0, 0, images.firstOrNull { it.isImage }?.sha256)
     is ShoppingListDocument -> {
         val active = items.filterNot { it.deleted }

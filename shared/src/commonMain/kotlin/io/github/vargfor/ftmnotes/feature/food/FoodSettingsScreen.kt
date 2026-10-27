@@ -30,14 +30,12 @@ fun FoodSettingsScreen(onBack: () -> Unit) {
     Scaffold(topBar = { BackTopBar(stringResource(Res.string.food_settings), onBack) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { ChoiceRow(stringResource(Res.string.food_target_units), UnitMode.entries, settings[Flags.foodUnits], { unitLabel(it) }, { set(Flags.foodUnits, it) }) }
-            item { ChoiceRow(stringResource(Res.string.food_volume_units), MetricVolume.entries, settings[Flags.foodVolume],
-                { stringResource(when (it) { MetricVolume.Auto -> Res.string.food_volume_auto; MetricVolume.Millilitres -> Res.string.food_volume_ml; MetricVolume.Decilitres -> Res.string.food_volume_dl }) },
-                { set(Flags.foodVolume, it) }) }
-            item { SwitchRow(stringResource(Res.string.food_keep_spoons), settings[Flags.foodKeepSpoons], { set(Flags.foodKeepSpoons, it) }) }
-            item { SwitchRow(stringResource(Res.string.food_density_setting), settings[Flags.foodUseDensities], { set(Flags.foodUseDensities, it) }) }
+            item { ChoiceRow(stringResource(Res.string.food_volume_units), MetricVolume.entries, settings[Flags.foodVolume], { stringResource(when (it) { MetricVolume.Auto -> Res.string.food_volume_auto; MetricVolume.Millilitres -> Res.string.food_volume_ml; MetricVolume.Decilitres -> Res.string.food_volume_dl }) }, help = Res.string.help_metric_volume, onSelect = { set(Flags.foodVolume, it) }) }
+            item { SwitchRow(stringResource(Res.string.food_keep_spoons), settings[Flags.foodKeepSpoons], { set(Flags.foodKeepSpoons, it) }, help = Res.string.help_spoons) }
+            item { SwitchRow(stringResource(Res.string.food_density_setting), settings[Flags.foodUseDensities], { set(Flags.foodUseDensities, it) }, help = Res.string.help_density) }
             item {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(Res.string.food_edit_densities), style = MaterialTheme.typography.titleMedium)
+                    HelpLabel(stringResource(Res.string.food_edit_densities), Res.string.help_density, style = MaterialTheme.typography.titleMedium)
                     Text(stringResource(Res.string.food_density_source), style = MaterialTheme.typography.bodySmall)
                     (Densities.gramsPerCup.keys + settings[Flags.foodDensities].keys).distinct().forEach { name ->
                         val value = Densities.find(name, settings[Flags.foodDensities])!!
@@ -51,16 +49,18 @@ fun FoodSettingsScreen(onBack: () -> Unit) {
                     OutlinedButton({ editName = ""; editDensity = null; densityEditor = true }) { Text(stringResource(Res.string.food_density_add)) }
                 }
             }
-            item { ChoiceRow(stringResource(Res.string.food_rounding), FoodRounding.entries, settings[Flags.foodRounding],
-                { stringResource(when (it) { FoodRounding.Kitchen -> Res.string.food_round_kitchen; FoodRounding.Exact -> Res.string.food_round_exact; FoodRounding.Custom -> Res.string.food_round_custom }) },
-                { set(Flags.foodRounding, it) }) }
+            item { ChoiceRow(stringResource(Res.string.food_rounding), FoodRounding.entries, settings[Flags.foodRounding], { stringResource(when (it) { FoodRounding.Kitchen -> Res.string.food_round_kitchen; FoodRounding.Exact -> Res.string.food_round_exact; FoodRounding.Custom -> Res.string.food_round_custom }) }, help = Res.string.help_rounding, onSelect = { set(Flags.foodRounding, it) }) }
             if (settings[Flags.foodRounding] == FoodRounding.Custom) item {
-                NumberEntry(Res.string.food_round_step, settings[Flags.foodRoundingStep], Modifier.padding(horizontal = 16.dp), allowBlank = false) { it?.let { set(Flags.foodRoundingStep, it) } }
+                NumberEntry(Res.string.food_round_step, settings[Flags.foodRoundingStep], Modifier.padding(horizontal = 16.dp), allowBlank = false, help = Res.string.help_rounding) { it?.let { set(Flags.foodRoundingStep, it) } }
             }
             listOf(Flags.foodStepConversions to Res.string.food_step_conversions, Flags.foodFanHint to Res.string.food_fan_hint,
                 Flags.foodKeepAwake to Res.string.food_keep_awake, Flags.foodIngredientChecks to Res.string.food_ingredient_checks,
                 Flags.foodTimers to Res.string.food_timers_setting, Flags.foodMultipleLists to Res.string.food_multiple_lists).forEach { (flag, label) ->
-                item { SwitchRow(stringResource(label), settings[flag], { set(flag, it) }) }
+                item { SwitchRow(stringResource(label), settings[flag], { set(flag, it) }, help = when(flag) {
+                    Flags.foodStepConversions -> Res.string.help_step_conversion
+                    Flags.foodFanHint -> Res.string.food_fan_explain
+                    else -> null
+                }) }
             }
             problem?.let { item { Text(stringResource(Res.string.status_error, it), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) } }
         }
@@ -68,7 +68,7 @@ fun FoodSettingsScreen(onBack: () -> Unit) {
     if (densityEditor) AlertDialog(onDismissRequest = { densityEditor = false }, title = { Text(stringResource(Res.string.food_edit_densities)) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(editName, { editName = it }, label = { Text(stringResource(Res.string.food_density_name)) })
-            NumberEntry(Res.string.food_density_grams_ml, editDensity, allowBlank = false) { editDensity = it }
+            NumberEntry(Res.string.food_density_grams_ml, editDensity, allowBlank = false, help = Res.string.help_density) { editDensity = it }
         } },
         confirmButton = { TextButton({ val name = Densities.key(editName); val value = editDensity
             if (name.isNotBlank() && value != null && value > 0) { set(Flags.foodDensities, settings[Flags.foodDensities] + (name to value)); densityEditor = false }

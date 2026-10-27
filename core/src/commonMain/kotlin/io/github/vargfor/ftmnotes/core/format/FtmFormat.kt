@@ -1,5 +1,6 @@
 package io.github.vargfor.ftmnotes.core.format
 
+import io.github.vargfor.ftmnotes.core.model.*
 import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.NoteDocument
@@ -49,6 +50,10 @@ object FtmFormat {
 
     /** Serializers for document types this app version can read. Grows as feature phases land. */
     internal val supported: Map<DocumentType, KSerializer<out FtmDocument>> = mapOf(
+        DocumentType.Exercise to ExerciseDocument.serializer(),
+        DocumentType.WorkoutTemplate to WorkoutTemplateDocument.serializer(),
+        DocumentType.WorkoutSession to WorkoutSessionDocument.serializer(),
+        DocumentType.TrainingPlan to TrainingPlanDocument.serializer(),
         DocumentType.Note to NoteDocument.serializer(),
         DocumentType.Settings to SettingsDocument.serializer(),
         DocumentType.Recipe to RecipeDocument.serializer(),

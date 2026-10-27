@@ -8,6 +8,7 @@ import io.github.vargfor.ftmnotes.core.model.*
 import io.github.vargfor.ftmnotes.core.notes.*
 import io.github.vargfor.ftmnotes.data.DocumentRepository
 import io.github.vargfor.ftmnotes.di.AppScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
@@ -60,7 +61,7 @@ class NoteEditorViewModel(
                     }
                 }
                 snapshotFlow { draft }.drop(1).debounce(300).collect { persist() }
-            } catch (e: Exception) { error = e.message }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { error = e.message }
         }
     }
 
@@ -119,6 +120,6 @@ class NoteEditorViewModel(
             }
             baseline = edited
             error = null
-        } catch (e: Exception) { error = e.message }
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { error = e.message }
     }
 }

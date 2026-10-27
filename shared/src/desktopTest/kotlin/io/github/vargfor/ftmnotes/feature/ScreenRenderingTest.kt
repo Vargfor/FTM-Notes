@@ -137,6 +137,7 @@ class ScreenRenderingTest {
             val label = runBlocking { getString(Res.string.import_copy_prompt) }
             runDesktopComposeUiTest(width = 412, height = 915) {
                 setContent { Content(Screen.Import, env, owner, false, 1f) }
+                onNodeWithText("Use an AI assistant (optional)").performScrollTo().performClick()
                 onNodeWithText(label).performScrollTo().performClick()
                 waitUntil(timeoutMillis = 10_000) { env.bridge.copiedText != null }
                 assertTrue(env.bridge.copiedText!!.contains("Tomato soup"))

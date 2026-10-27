@@ -6,6 +6,11 @@ import io.github.vargfor.ftmnotes.core.backup.stampChecklistEdits
 import io.github.vargfor.ftmnotes.core.format.contentHash
 import io.github.vargfor.ftmnotes.core.format.listProjection
 import io.github.vargfor.ftmnotes.core.format.plainText
+import io.github.vargfor.ftmnotes.core.model.*
+import io.github.vargfor.ftmnotes.core.training.*
+import io.github.vargfor.ftmnotes.data.db.TrainingDao
+import io.github.vargfor.ftmnotes.data.db.TrainingSessionEntity
+import io.github.vargfor.ftmnotes.data.db.TrainingSetEntity
 import io.github.vargfor.ftmnotes.core.model.DocumentType
 import io.github.vargfor.ftmnotes.core.model.FtmDocument
 import io.github.vargfor.ftmnotes.core.model.Hlc
@@ -75,8 +80,12 @@ class DocumentRepository(
     private val dao: DocumentDao,
     private val transactor: Transactor,
     private val clock: DeviceClock,
+    private val training: TrainingDao? = null,
     private val now: () -> Instant = { Clock.System.now() },
 ) {
+
+    fun observeDocuments(type: DocumentType): Flow<List<StoredDocument>> = dao.observeType(type.wire).map { rows -> rows.mapNotNull { it.toStored() } }
+    suspend fun documents(type: DocumentType): List<FtmDocument> = dao.liveType(type.wire).mapNotNull { it.decode() }
 
     // ---------------------------------------------------------------- reads
 
@@ -175,6 +184,10 @@ class DocumentRepository(
                 payload.createdAt ?: Instant.fromEpochMilliseconds(record.createdAt), payload.updatedAt ?: Instant.fromEpochMilliseconds(record.updatedAt),
                 record.deletedAt?.let(Instant::fromEpochMilliseconds), false), dirty = true)
         } else {
+            if (training != null) {
+                training.deleteSets(record.id); training.deleteSession(record.id)
+                if (training.active()?.sessionId == record.id) training.clearActive()
+            }
             clock.receive(Hlc.parse(record.hlc))
             val existing = dao.get(record.id)
             dao.upsert(DocumentEntity(record.id, record.type, "", "", record.payloadJson, FtmFormat.VERSION,
@@ -261,6 +274,15 @@ class DocumentRepository(
         importBatch: String? = existing?.importBatch,
     ) {
         val stored = document.withMeta(id, createdAt, updatedAt)
+        if (stored is WorkoutSessionDocument && training != null) {
+            training.deleteSets(id)
+            if (deletedAt == null && !purged) {
+                training.putSession(TrainingSessionEntity(id, stored.status.name, stored.startedAt?.toEpochMilliseconds(), stored.endedAt?.toEpochMilliseconds(), stored.templateId, stored.planId))
+                training.insertSets(stored.exercises.flatMap { e -> e.sets.map { set -> TrainingSetEntity(id, requireNotNull(set.id),
+                    e.exercise.id ?: e.exercise.name, e.snapshot.name, e.snapshot.tracking.name, set.kind.name, set.completed,
+                    set.weight?.let { TrainingEngine.kg(it, set.unit) }, set.reps, set.seconds, set.metres, stored.endedAt?.toEpochMilliseconds()) } })
+            } else training.deleteSession(id)
+        }
         val plain = stored.plainText()
         val projection = stored.listProjection()
         dao.upsert(
@@ -315,8 +337,17 @@ class DocumentRepository(
     private suspend fun setTrashed(id: String, trashed: Boolean) = transactor.write {
         val existing = dao.get(id)?.takeUnless { it.purged } ?: return@write
         if ((existing.deletedAt != null) == trashed) return@write
+        var restored = existing
+        if (existing.type == DocumentType.WorkoutSession.wire && training != null) {
+            if (trashed) { training.deleteSets(id); training.deleteSession(id); if (training.active()?.sessionId == id) training.clearActive() }
+            else existing.decode()?.let { value ->
+                val recovered = if (value is WorkoutSessionDocument && value.status == SessionStatus.InProgress) value.copy(status = SessionStatus.Draft) else value
+                writeRow(id, recovered, existing, Instant.fromEpochMilliseconds(existing.createdAt), Instant.fromEpochMilliseconds(existing.updatedAt), Hlc.parse(existing.hlc), true, deletedAt = null)
+                restored = dao.get(id)!!
+            }
+        }
         dao.upsert(
-            existing.copy(
+            restored.copy(
                 deletedAt = if (trashed) now().toEpochMilliseconds() else null,
                 hlc = clock.now().encode(),
                 dirty = true,
@@ -326,6 +357,9 @@ class DocumentRepository(
 
     private suspend fun purgeRow(id: String) {
         val existing = dao.get(id)?.takeUnless { it.purged } ?: return
+        if (existing.type == DocumentType.WorkoutSession.wire && training != null) {
+            training.deleteSets(id); training.deleteSession(id); if (training.active()?.sessionId == id) training.clearActive()
+        }
         val tombstone = """{"type":"${existing.type}","id":"$id"}"""
         dao.upsert(
             existing.copy(
@@ -350,7 +384,8 @@ class DocumentRepository(
         val tags = document.tags.map { it.trim().replace(Regex("\\s+"), " ") }
             .filter { it.isNotEmpty() }
             .distinctBy(::tagKey)
-        val withTags = if (tags == document.tags) document else document.withOrganisation(tags = tags)
+        require(TrainingValidation.issues(document).isEmpty()) { TrainingValidation.issues(document).joinToString { it.path + ": " + it.message } }
+        val withTags = (if (tags == document.tags) document else document.withOrganisation(tags = tags)).normalisedTraining()
         return if (withTags is RecipeDocument) withTags.normalisedContent()
         else if (withTags is ShoppingListDocument) withTags.copy(items = withTags.items.map { it.copy(id = it.id ?: Ids.newId()) })
         else if (withTags is NoteDocument && withTags.items.any { it.id == null }) {

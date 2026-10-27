@@ -1,0 +1,645 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Vargfor/FTM-Notes/schemas/ftm/v1/workout_session.schema.json",
+  "title": "FTM workout_session v1",
+  "type": "object",
+  "properties": {
+    "type": {
+      "const": "workout_session"
+    },
+    "id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pinned": {
+      "type": "boolean"
+    },
+    "archived": {
+      "type": "boolean"
+    },
+    "color": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "createdAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "in_progress",
+        "finished"
+      ]
+    },
+    "startedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "endedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "templateId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "templateName": {
+      "type": "string"
+    },
+    "planId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "planWeek": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "planDayId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bodyweight": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0
+    },
+    "bodyweightUnit": {
+      "enum": [
+        "kg",
+        "lb"
+      ]
+    },
+    "exercises": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sessionExercise"
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "rating": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 5
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "type"
+  ],
+  "$defs": {
+    "field": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "number",
+            "text",
+            "boolean"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ]
+    },
+    "exerciseRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "tracking": {
+          "anyOf": [
+            {
+              "enum": [
+                "weight_reps",
+                "bodyweight_reps",
+                "reps",
+                "duration",
+                "distance",
+                "duration_distance"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "equipment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "templateRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "load": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "absolute",
+            "percent_1rm",
+            "percent_tm",
+            "rpe",
+            "rir"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "warmup",
+            "working",
+            "drop",
+            "failure",
+            "amrap"
+          ]
+        },
+        "reps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "repMin": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "repMax": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "load": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/load"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "metres": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "customValues": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tracking": {
+          "enum": [
+            "weight_reps",
+            "bodyweight_reps",
+            "reps",
+            "duration",
+            "distance",
+            "duration_distance"
+          ]
+        },
+        "equipment": {
+          "type": "string"
+        },
+        "muscleGroups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        },
+        "increment": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "weekTarget": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "weight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "reps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "unit": {
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "week"
+      ]
+    },
+    "block": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exercise": {
+          "$ref": "#/$defs/exerciseRef"
+        },
+        "supersetGroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "restSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string"
+        },
+        "sets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "performed": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "kind": {
+          "enum": [
+            "warmup",
+            "working",
+            "drop",
+            "failure",
+            "amrap"
+          ]
+        },
+        "weight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unit": {
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
+        "reps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "metres": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "rpe": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 10
+        },
+        "rir": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 10
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "customValues": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sessionExercise": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exercise": {
+          "$ref": "#/$defs/exerciseRef"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/snapshot"
+        },
+        "supersetGroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "restSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string"
+        },
+        "sets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/performed"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "day": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "template": {
+          "$ref": "#/$defs/templateRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "override": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dayId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exercise": {
+          "$ref": "#/$defs/exerciseRef"
+        },
+        "sets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/target"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "week"
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "linear",
+            "double",
+            "manual"
+          ]
+        },
+        "increment": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "enum": [
+            "kg",
+            "lb"
+          ]
+        },
+        "frequency": {
+          "enum": [
+            "session",
+            "week"
+          ]
+        },
+        "missesBeforeDeload": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deloadPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "repMin": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repMax": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "manualWeeks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/weekTarget"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "exerciseRule": {
+      "type": "object",
+      "properties": {
+        "exercise": {
+          "$ref": "#/$defs/exerciseRef"
+        },
+        "rule": {
+          "$ref": "#/$defs/rule"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

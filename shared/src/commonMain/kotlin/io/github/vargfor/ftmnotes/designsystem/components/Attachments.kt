@@ -41,7 +41,7 @@ fun AttachmentList(refs: List<AttachmentRef>, onRemove: ((String) -> Unit)? = nu
     var error by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         refs.forEach { ref ->
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            ElevatedCard(Modifier.fillMaxWidth().cardOutline()) {
                 Column(Modifier.padding(8.dp)) {
                     if (ref.isImage) AttachmentThumbnail(ref.sha256, ref.name, Modifier.clickable { scope.launch {
                         try { bridge.openFile(store.path(ref.sha256), ref.mimeType) } catch (e: Exception) { error = e.message }

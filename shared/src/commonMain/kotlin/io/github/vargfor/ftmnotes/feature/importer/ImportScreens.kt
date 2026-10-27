@@ -11,6 +11,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.vargfor.ftmnotes.core.format.*
+import io.github.vargfor.ftmnotes.core.model.*
+import io.github.vargfor.ftmnotes.feature.training.contentTypeLabel
+import io.github.vargfor.ftmnotes.feature.settings.ChoiceRow
 import io.github.vargfor.ftmnotes.core.backup.readLimited
 import io.github.vargfor.ftmnotes.core.backup.attachmentRefs
 import io.github.vargfor.ftmnotes.data.*
@@ -23,11 +26,14 @@ import org.jetbrains.compose.resources.*
 import org.koin.compose.koinInject
 
 @Composable
-fun ImportHomeScreen(onBack: () -> Unit, onPreview: (String) -> Unit, onFoodImport: () -> Unit = {}) {
+fun ImportHomeScreen(onBack: () -> Unit, onPreview: (String) -> Unit, onFoodImport: () -> Unit = {}, initialType: DocumentType = DocumentType.Note) {
     val imports: ImportCoordinator = koinInject()
     val bridge = koinInject<AppPlatform>().bridge
     val scope = rememberCoroutineScope()
     val history by imports.history.collectAsStateWithLifecycle(emptyList())
+    var strongOptions by remember { mutableStateOf(false) }
+    var csvUnit by remember { mutableStateOf(MassUnit.Kg) }
+    var csvDistance by remember { mutableStateOf(1.0) }
     var pasted by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
@@ -62,26 +68,14 @@ fun ImportHomeScreen(onBack: () -> Unit, onPreview: (String) -> Unit, onFoodImpo
                     imports.prepareFtm(text)
                 } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.import_ftm_file)) }
             }
-            item {
-                Text(stringResource(Res.string.import_ai), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(Res.string.import_prompt), style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onFoodImport) { Text(stringResource(Res.string.food_recipe_prompt)) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button({ scope.launch {
-                        try { bridge.copyText(Res.readBytes("files/AI_PROMPT_note.md").decodeToString()); snackbar.showSnackbar(getString(Res.string.import_prompt_copied)) }
-                        catch (e: Exception) { problem = e.message }
-                    } }) { Text(stringResource(Res.string.import_copy_prompt)) }
-                    OutlinedButton({ scope.launch {
-                        try { bridge.shareText(Res.readBytes("files/AI_PROMPT_note.md").decodeToString()) }
-                        catch (e: Exception) { problem = e.message }
-                    } }) { Text(stringResource(Res.string.import_share_prompt)) }
-                }
-            }
+            item { OutlinedButton({ strongOptions = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.training_strong_import)) } }
+            item { OutlinedButton(onFoodImport) { Text(stringResource(Res.string.food_import_url)) } }
             item {
                 OutlinedTextField(pasted, { pasted = it }, Modifier.fillMaxWidth().heightIn(min = 160.dp),
                     label = { Text(stringResource(Res.string.import_paste)) }, supportingText = { Text(stringResource(Res.string.import_clipboard)) })
                 Button({ prepare { imports.prepareFtm(pasted) } }, enabled = !busy && pasted.isNotBlank()) { Text(stringResource(Res.string.import_preview)) }
             }
+            item { PromptActions(initialType) { problem = it } }
             if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             problem?.let { message -> item { Text(stringResource(Res.string.status_error, message), color = MaterialTheme.colorScheme.error) } }
             if (history.isNotEmpty()) item { Text(stringResource(Res.string.import_history), style = MaterialTheme.typography.titleLarge) }
@@ -93,6 +87,16 @@ fun ImportHomeScreen(onBack: () -> Unit, onPreview: (String) -> Unit, onFoodImpo
             }
         }
     }
+    if (strongOptions) AlertDialog(onDismissRequest = { strongOptions = false }, title = { Text(stringResource(Res.string.training_strong_import)) },
+        text = { Column {
+            ChoiceRow(stringResource(Res.string.training_csv_units), MassUnit.entries, csvUnit, { it.wire }) { csvUnit = it }
+            ChoiceRow(stringResource(Res.string.training_csv_distance), listOf(1.0, 1000.0, 1609.344), csvDistance, { when(it) { 1000.0 -> "km"; 1609.344 -> "mi"; else -> "m" } }) { csvDistance = it }
+        } }, confirmButton = { TextButton({ strongOptions = false; prepare {
+            val file = bridge.pickFiles().singleOrNull() ?: throw CancellationException()
+            imports.prepareStrong(file, csvUnit, csvDistance)
+        } }) { Text(stringResource(Res.string.import_ftm_file)) } },
+        dismissButton = { TextButton({ strongOptions = false }) { Text(stringResource(Res.string.action_cancel)) } })
+
 }
 
 @Composable
@@ -122,7 +126,7 @@ fun ImportPreviewScreen(id: String, onBack: () -> Unit) {
                             catch (e: Exception) { problem = e.message }
                             finally { busy = false }
                         }
-                    }, enabled = !busy && selected.orEmpty().isNotEmpty(), modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.import_commit)) }
+                    }, enabled = !busy && selected.orEmpty().isNotEmpty() && preview?.questions.orEmpty().none { q -> q.ownerId in selected.orEmpty() }, modifier = Modifier.weight(1f)) { Text(stringResource(Res.string.import_commit)) }
                     else {
                         Text(stringResource(if (undone) Res.string.import_undone else Res.string.import_complete, imported!!), Modifier.weight(1f))
                         TextButton({ scope.launch { try { imports.undo(id); undone = true } catch (e: Exception) { problem = e.message } } }, enabled = !undone) { Text(stringResource(Res.string.import_undo)) }
@@ -142,6 +146,23 @@ fun ImportPreviewScreen(id: String, onBack: () -> Unit) {
                         OutlinedTextField(tags, { tags = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.import_tags)) })
                     }
                 }
+                if (current.originals != null) item { Text(stringResource(Res.string.training_dependencies), style = MaterialTheme.typography.bodySmall) }
+                items(current.questions, key = { it.key }) { question ->
+                    OutlinedCard(border = cardBorder()) { Column(Modifier.padding(12.dp)) {
+                        Text(stringResource(Res.string.training_resolve_reference, question.name), style = MaterialTheme.typography.titleMedium)
+                        fun resolve(target: String) { scope.launch {
+                            busy = true
+                            try {
+                                val roots = current.drafts.filter { it.id in selected.orEmpty() }.map { it.document.documentType to it.document.title }.toSet()
+                                val updated = imports.resolveReference(id, question.key, target)
+                                preview = updated
+                                selected = updated.drafts.filter { (it.document.documentType to it.document.title) in roots }.map { it.id }
+                            } catch (e: Exception) { problem = e.message } finally { busy = false }
+                        } }
+                        question.candidates.forEach { candidate -> TextButton({ resolve(candidate.id) }, enabled = !busy && imported == null) { Text(candidate.name + " \u00b7 " + candidate.detail) } }
+                        if (!question.key.contains("/days/")) TextButton({ resolve("@new") }, enabled = !busy && imported == null) { Text(stringResource(Res.string.training_create_exercise)) }
+                    } }
+                }
                 if (current.drafts.isEmpty()) item { Text(stringResource(Res.string.import_no_items)) }
                 if (current.issues.isNotEmpty()) item {
                     Text(stringResource(Res.string.import_issues), style = MaterialTheme.typography.titleMedium)
@@ -149,7 +170,7 @@ fun ImportPreviewScreen(id: String, onBack: () -> Unit) {
                         color = if (issue.severity == ReadIssue.Severity.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 items(current.drafts, key = { it.id }) { draft ->
-                    ElevatedCard {
+                    ElevatedCard(Modifier.cardOutline()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(draft.id in selected.orEmpty(), enabled = imported == null, onCheckedChange = {
@@ -157,6 +178,7 @@ fun ImportPreviewScreen(id: String, onBack: () -> Unit) {
                                 })
                                 Text(draft.document.title.ifBlank { stringResource(Res.string.note_untitled) }, style = MaterialTheme.typography.titleMedium)
                             }
+                            Text(contentTypeLabel(draft.document.documentType), style = MaterialTheme.typography.labelMedium)
                             if (draft.duplicate) Text(stringResource(Res.string.import_duplicate), color = MaterialTheme.colorScheme.primary)
                             Text(draft.document.plainText().take(600), style = MaterialTheme.typography.bodyMedium)
                             AttachmentList(draft.document.attachmentRefs())

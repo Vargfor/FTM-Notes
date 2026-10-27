@@ -1,5 +1,7 @@
 package io.github.vargfor.ftmnotes.core.settings
 
+import io.github.vargfor.ftmnotes.core.model.MassUnit
+
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -107,6 +109,28 @@ enum class NotesLayout(override val wire: String) : WireValue {
 
 /** Every flag the app knows. Unknown keys found in storage (e.g. from a newer version) are kept, not dropped. */
 object Flags {
+    val trainingUnits = FeatureFlag.Choice("training.units", MassUnit.Kg, FlagScope.Synced, MassUnit.entries)
+    val trainingPrefill = FeatureFlag.Bool("training.prefill", true, FlagScope.Synced)
+    val trainingPreviousGlobal = FeatureFlag.Bool("training.previous_global", true, FlagScope.Synced)
+    val trainingRest = FeatureFlag.Bool("training.rest_timer", true, FlagScope.Synced)
+    val trainingRestSeconds = FeatureFlag.IntChoice("training.rest_seconds", 90, FlagScope.Synced, listOf(0,30,60,90,120,180,300))
+    val trainingKeepAwake = FeatureFlag.Bool("training.keep_awake", true, FlagScope.Synced)
+    val trainingHaptics = FeatureFlag.Bool("training.haptics", true, FlagScope.Device)
+    val trainingSupersets = FeatureFlag.Bool("training.superset_advance", true, FlagScope.Synced)
+    val trainingSuggestions = FeatureFlag.Bool("training.suggestions", true, FlagScope.Synced)
+    val trainingAutoAdvance = FeatureFlag.Bool("training.auto_advance", false, FlagScope.Synced)
+    val trainingWarmups = FeatureFlag.Bool("training.warmup_generator", false, FlagScope.Synced)
+    val trainingPlateCalculator = FeatureFlag.Bool("training.plate_calculator", true, FlagScope.Synced)
+    val trainingPrs = FeatureFlag.Bool("training.pr_detection", true, FlagScope.Synced)
+    val trainingIncludeWarmups = FeatureFlag.Bool("training.include_warmups", false, FlagScope.Synced)
+    val trainingBrzycki = FeatureFlag.Bool("training.brzycki", false, FlagScope.Synced)
+    val trainingBodyweight = FeatureFlag.Bool("training.bodyweight_log", false, FlagScope.Synced)
+    val trainingBar = FeatureFlag.Number("training.bar_weight", 20.0, FlagScope.Synced)
+    val trainingPlates = FeatureFlag.Text("training.plates", "25:2,20:4,15:2,10:2,5:2,2.5:2,1.25:2", FlagScope.Synced)
+    val trainingMaxes = FeatureFlag.DecimalMap("training.one_rm", FlagScope.Synced)
+    val trainingTms = FeatureFlag.DecimalMap("training.training_max", FlagScope.Synced)
+    val activePlan = FeatureFlag.Text("training.active_plan", "", FlagScope.Device)
+
     val foodUnits = FeatureFlag.Choice("food.units", UnitMode.Metric, FlagScope.Synced, UnitMode.entries)
     val foodVolume = FeatureFlag.Choice("food.volume", MetricVolume.Auto, FlagScope.Synced, MetricVolume.entries)
     val foodKeepSpoons = FeatureFlag.Bool("food.keep_spoons", true, FlagScope.Synced)
@@ -126,6 +150,7 @@ object Flags {
     val tabOrder = FeatureFlag.Text("app.tabs.order", "training,food,notes", FlagScope.Synced)
     // Appearance: per device, since a phone and a tablet may want different looks.
     val theme = FeatureFlag.Choice("app.theme", ThemeMode.System, FlagScope.Device, ThemeMode.entries)
+    val helpIcons = FeatureFlag.Bool("app.help_icons", true, FlagScope.Device)
     val pureBlack = FeatureFlag.Bool("app.theme.pure_black", false, FlagScope.Device)
 
     // Sections
@@ -150,7 +175,8 @@ object Flags {
     }
 
     val all: List<FeatureFlag<*>> = listOf(
-        theme, pureBlack, trainingTab, foodTab, notesTab, startTab,
+        trainingUnits, trainingPrefill, trainingPreviousGlobal, trainingRest, trainingRestSeconds, trainingKeepAwake, trainingHaptics, trainingSupersets, trainingSuggestions, trainingAutoAdvance, trainingWarmups, trainingPlateCalculator, trainingPrs, trainingIncludeWarmups, trainingBrzycki, trainingBodyweight, trainingBar, trainingPlates, trainingMaxes, trainingTms, activePlan,
+        theme, helpIcons, pureBlack, trainingTab, foodTab, notesTab, startTab,
         notesLayout, checkedSection, swipeToArchive, trashRetentionDays,
         backupEnabled, backupFolder, backupRetention, tabOrder,
         foodUnits, foodVolume, foodKeepSpoons, foodUseDensities, foodDensities, foodRounding, foodRoundingStep,

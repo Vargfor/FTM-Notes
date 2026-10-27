@@ -4,6 +4,7 @@ import io.github.vargfor.ftmnotes.core.backup.*
 import io.github.vargfor.ftmnotes.core.format.*
 import io.github.vargfor.ftmnotes.core.model.*
 import io.github.vargfor.ftmnotes.core.settings.*
+import io.github.vargfor.ftmnotes.core.training.*
 import io.github.vargfor.ftmnotes.data.db.*
 import io.github.vargfor.ftmnotes.platform.PlatformBridge
 import io.github.vargfor.ftmnotes.settings.SettingsRepository
@@ -24,6 +25,7 @@ class BackupService(
     private val revisions: DocumentRevisionDao, private val prefs: DevicePrefDao,
     private val settings: SettingsRepository, private val transactor: Transactor,
     private val clock: DeviceClock, private val fs: FileSystem = FileSystem.SYSTEM,
+    private val training: TrainingDao? = null,
 ) {
     private val mutex = Mutex()
     val status get() = prefs.observeAll()
@@ -54,8 +56,9 @@ class BackupService(
                 BackupAttachment(meta.sha256, meta.mime, meta.size)
             }
             val keys = Flags.all.filter { it.scope == FlagScope.Device && !it.id.startsWith("backup.") }.map { it.id }.toSet()
-            val local = prefs.all().filter { it.key in keys }.associate { it.key to Json.parseToJsonElement(it.value) }
-            BackupManifest(createdAt = Clock.System.now().toEpochMilliseconds(), records = records, attachments = blobs, revisions = history, preferences = local)
+            val local = prefs.all().filter { it.key in keys || it.key.startsWith("training.plan.") }.associate { it.key to Json.parseToJsonElement(it.value) }
+            val live = training?.active()?.let { TrainingRecovery(it.sessionId, it.restEnd, it.restToken, it.alertedToken, it.exerciseId) }
+            BackupManifest(createdAt = Clock.System.now().toEpochMilliseconds(), records = records, attachments = blobs, revisions = history, preferences = local, training = live)
         }
         fs.createDirectories(root)
         val path = root / "FTM-Notes-${manifest.createdAt}-${Ids.newId().takeLast(8)}.zip"
@@ -103,8 +106,24 @@ class BackupService(
             transactor.write {
                 var copies = 0
                 var displaced = 0
+                val retained = training?.active()
+                val retainedDocument = retained?.let { repository.get(it.sessionId)?.document as? WorkoutSessionDocument }
                 val fingerprints = documents.allLivePayloads().mapNotNull { runCatching { FtmFormat.decodeDocument(it).importFingerprint() }.getOrNull() }.toMutableSet()
-                for (incoming in manifest.records) {
+                for (original in manifest.records) {
+                    val incomingSession = if (!original.purged && original.type == DocumentType.WorkoutSession.wire)
+                        FtmFormat.decodeDocument(original.payloadJson) as WorkoutSessionDocument else null
+                    // A restore cannot replace an ongoing workout. Preserve a different recovered copy as a draft.
+                    if (original.id == retained?.sessionId) {
+                        if (incomingSession != null && !original.purged && original.deletedAt == null &&
+                            incomingSession.importFingerprint() != retainedDocument?.importFingerprint()) {
+                            val draft = incomingSession.copy(id = Ids.newId(), status = SessionStatus.Draft, endedAt = null)
+                            if (fingerprints.add(draft.importFingerprint())) { repository.save(draft); copies++ }
+                        }
+                        continue
+                    }
+                    val recoverActive = retained == null && manifest.training?.sessionId == original.id && incomingSession?.status == SessionStatus.InProgress && original.deletedAt == null
+                    val incoming = if (incomingSession?.status == SessionStatus.InProgress && !recoverActive)
+                        original.copy(payloadJson = FtmFormat.encodeDocument(incomingSession.copy(status = SessionStatus.Draft))) else original
                     val current = documents.get(incoming.id)?.backupRecord()
                     val merged = DocumentMerger.merge(current, incoming, conflictSuffix)
                     clock.receive(Hlc.parse(incoming.hlc))
@@ -129,17 +148,28 @@ class BackupService(
                 }
                 (manifest.records.map { it.id } + manifest.revisions.map { it.docId }).distinct().forEach { revisions.trim(it) }
                 val deviceKeys = Flags.all.filter { it.scope == FlagScope.Device && !it.id.startsWith("backup.") }.map { it.id }.toSet()
-                manifest.preferences.filterKeys { it in deviceKeys }.forEach { (key, value) ->
+                manifest.preferences.filterKeys { it in deviceKeys || it.startsWith("training.plan.") }.forEach { (key, value) ->
                     if (prefs.get(key) == null) prefs.put(DevicePrefEntity(key, value.toString()))
                 }
+                if (retained == null && training != null) {
+                    val recovery = manifest.training
+                    val restored = recovery?.let { repository.get(it.sessionId) }
+                    if (restored?.deletedAt == null && (restored?.document as? WorkoutSessionDocument)?.status == SessionStatus.InProgress) {
+                        training.putActive(ActiveWorkoutEntity(sessionId = recovery!!.sessionId, restEnd = recovery.restEnd,
+                            restToken = recovery.restToken, alertedToken = recovery.alertedToken, exerciseId = recovery.exerciseId))
+                    }
+                }
                 RestoreSummary(manifest.records.size, copies, displaced)
-            }
+            }.also { bridge.workoutChanged(training?.active()?.sessionId) }
         }
     }
 
     suspend fun exportFtm(): Path = withContext(Dispatchers.IO) {
-        val docs = documents.all().filter { !it.purged && it.deletedAt == null && it.type != DocumentType.Settings.wire }
-            .map { FtmFormat.decodeDocument(it.payloadJson) }
+        val all = documents.all().filterNot { it.purged }.map { FtmFormat.decodeDocument(it.payloadJson) }.toMutableList()
+        val liveIds = documents.all().filter { !it.purged && it.deletedAt == null && it.type != DocumentType.Settings.wire }.map { it.id }.toSet()
+        val roots = all.filter { it.id in liveIds && (it !is WorkoutSessionDocument || it.status == SessionStatus.Finished) }.mapNotNull { it.id }.toSet()
+        val docs = TrainingBundles.exportClosure(roots, all)
+        require(TrainingBundles.validateReferences(docs, docs).isEmpty()) { "Export has unresolved Training dependencies" }
         fs.createDirectories(root)
         (root / "FTM-Notes.ftm.json").also { path -> fs.write(path) { writeUtf8(FtmFormat.write(docs)) } }
     }
